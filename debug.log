@@ -1,0 +1,636 @@
+2024-12-04 13:58:34,182 - main - INFO - Logging system initialized in debug mode
+2024-12-04 13:58:34,220 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 13:58:34,275 - main - ERROR - Fatal error occurred: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 13:58:34,281 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 13:59:53,558 - main - INFO - Logging system initialized in debug mode
+2024-12-04 13:59:53,595 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 13:59:53,647 - main - ERROR - Fatal error occurred: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 13:59:53,653 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 14:07:09,376 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:07:09,416 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:07:09,470 - main - ERROR - Fatal error occurred: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 14:07:09,476 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 86, in _init_ui
+    self.llm_workspace = LLMWorkspace()
+                         ^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 39, in __init__
+    self._apply_styles()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\llm_workspace.py", line 107, in _apply_styles
+    self.setStyleSheet(self.style_manager.get_component_style(StyleClass.LLM_WORKSPACE))
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LLM_WORKSPACE'. Did you mean: 'ML_WORKSPACE'?
+2024-12-04 14:08:23,582 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:08:23,619 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:08:23,673 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'MainWindow' object has no attribute 'is_dir'
+2024-12-04 14:08:23,685 - src.utils.lazy_loading - DEBUG - Created component performance_monitor in 0.012s
+2024-12-04 14:08:23,695 - src.utils.lazy_loading - ERROR - Error creating component python_console: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:08:23,697 - main - ERROR - Fatal error occurred: 'NoneType' object has no attribute 'file_opened'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 119, in _init_ui
+    project_explorer.file_opened.connect(self.open_file)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'file_opened'
+2024-12-04 14:08:23,702 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 119, in _init_ui
+    project_explorer.file_opened.connect(self.open_file)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'file_opened'
+2024-12-04 14:30:33,425 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:30:33,462 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:30:33,463 - main - ERROR - Fatal error occurred: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 72, in _init_ui
+    project_explorer = ProjectExplorer(self)
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\project_explorer.py", line 43, in __init__
+    self.project_root = Path(project_root)
+                        ^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\pathlib.py", line 1163, in __init__
+    super().__init__(*args)
+  File "C:\Program Files\Python312\Lib\pathlib.py", line 373, in __init__
+    raise TypeError(
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:30:33,468 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 47, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 72, in _init_ui
+    project_explorer = ProjectExplorer(self)
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\project_explorer.py", line 43, in __init__
+    self.project_root = Path(project_root)
+                        ^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\pathlib.py", line 1163, in __init__
+    super().__init__(*args)
+  File "C:\Program Files\Python312\Lib\pathlib.py", line 373, in __init__
+    raise TypeError(
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:32:55,190 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:32:55,229 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:32:55,326 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'MainWindow' object has no attribute 'is_dir'
+2024-12-04 14:32:55,329 - src.utils.lazy_loading - DEBUG - Created component performance_monitor in 0.002s
+2024-12-04 14:32:55,333 - src.utils.lazy_loading - ERROR - Error creating component python_console: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:32:55,361 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'save_file'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 150, in setup_tool_bar
+    save_action.triggered.connect(self.save_file)
+                                  ^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'save_file'
+2024-12-04 14:32:55,406 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 150, in setup_tool_bar
+    save_action.triggered.connect(self.save_file)
+                                  ^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'save_file'
+2024-12-04 14:35:59,518 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:35:59,556 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:35:59,642 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'MainWindow' object has no attribute 'is_dir'
+2024-12-04 14:35:59,645 - src.utils.lazy_loading - DEBUG - Created component performance_monitor in 0.002s
+2024-12-04 14:35:59,649 - src.utils.lazy_loading - ERROR - Error creating component python_console: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:35:59,684 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'run_current_file'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 157, in setup_tool_bar
+    run_action.triggered.connect(self.run_current_file)
+                                 ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'run_current_file'. Did you mean: 'save_current_file'?
+2024-12-04 14:35:59,765 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 157, in setup_tool_bar
+    run_action.triggered.connect(self.run_current_file)
+                                 ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'run_current_file'. Did you mean: 'save_current_file'?
+2024-12-04 14:42:37,425 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:42:37,463 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:42:37,549 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'MainWindow' object has no attribute 'is_dir'
+2024-12-04 14:42:37,552 - src.utils.lazy_loading - DEBUG - Created component performance_monitor in 0.002s
+2024-12-04 14:42:37,556 - src.utils.lazy_loading - ERROR - Error creating component python_console: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:42:37,596 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'debug_current_file'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 162, in setup_tool_bar
+    debug_action.triggered.connect(self.debug_current_file)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'debug_current_file'. Did you mean: 'run_current_file'?
+2024-12-04 14:42:37,656 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 127, in _init_ui
+    self.setup_tool_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 162, in setup_tool_bar
+    debug_action.triggered.connect(self.debug_current_file)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'debug_current_file'. Did you mean: 'run_current_file'?
+2024-12-04 14:54:39,765 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:54:39,802 - main - ERROR - Fatal error occurred: ComponentLoader.register_component() got an unexpected keyword argument 'project_root'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 42, in __init__
+    component_loader.register_component("project_explorer", ProjectExplorer, project_root=os.getcwd())
+TypeError: ComponentLoader.register_component() got an unexpected keyword argument 'project_root'
+2024-12-04 14:54:39,804 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 42, in __init__
+    component_loader.register_component("project_explorer", ProjectExplorer, project_root=os.getcwd())
+TypeError: ComponentLoader.register_component() got an unexpected keyword argument 'project_root'
+2024-12-04 14:57:51,241 - main - INFO - Logging system initialized in debug mode
+2024-12-04 14:57:51,280 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'MainWindow'
+2024-12-04 14:57:51,372 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'MainWindow' object has no attribute 'is_dir'
+2024-12-04 14:57:51,374 - src.utils.lazy_loading - DEBUG - Created component performance_monitor in 0.001s
+2024-12-04 14:57:51,379 - src.utils.lazy_loading - ERROR - Error creating component python_console: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:57:51,379 - main - ERROR - Fatal error occurred: 'PythonConsole' object has no attribute 'prompt'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 122, in _init_ui
+    python_console = PythonConsole(self)
+                     ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 15, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 42, in setup_ui
+    self.write_prompt()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 46, in write_prompt
+    prompt = self.prompt
+             ^^^^^^^^^^^
+AttributeError: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 14:57:51,390 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 122, in _init_ui
+    python_console = PythonConsole(self)
+                     ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 15, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 42, in setup_ui
+    self.write_prompt()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\python_console.py", line 46, in write_prompt
+    prompt = self.prompt
+             ^^^^^^^^^^^
+AttributeError: 'PythonConsole' object has no attribute 'prompt'
+2024-12-04 15:35:49,542 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:35:49,581 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:35:49,666 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:35:49,793 - main - ERROR - Fatal error occurred: type object 'StyleClass' has no attribute 'TOOLBAR'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 80, in setup_ui
+    toolbar.setStyleSheet(self.style_manager.get_component_style(StyleClass.TOOLBAR))
+                                                                 ^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'TOOLBAR'. Did you mean: 'TOOL_BAR'?
+2024-12-04 15:35:49,800 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 80, in setup_ui
+    toolbar.setStyleSheet(self.style_manager.get_component_style(StyleClass.TOOLBAR))
+                                                                 ^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'TOOLBAR'. Did you mean: 'TOOL_BAR'?
+2024-12-04 15:39:46,284 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:39:46,325 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:39:46,410 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:39:46,414 - main - ERROR - Fatal error occurred: type object 'StyleClass' has no attribute 'LABEL'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 86, in setup_ui
+    self.branch_label.setStyleSheet(self.style_manager.get_component_style(StyleClass.LABEL))
+                                                                           ^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LABEL'
+2024-12-04 15:39:46,419 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 86, in setup_ui
+    self.branch_label.setStyleSheet(self.style_manager.get_component_style(StyleClass.LABEL))
+                                                                           ^^^^^^^^^^^^^^^^
+AttributeError: type object 'StyleClass' has no attribute 'LABEL'
+2024-12-04 15:41:51,437 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:41:51,476 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:41:51,564 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:41:51,646 - src.utils.git_manager - ERROR - Git command failed: rev-parse --abbrev-ref HEAD
+2024-12-04 15:41:51,675 - main - ERROR - Fatal error occurred: type object 'Qt' has no attribute 'QSize'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 101, in setup_ui
+    btn.setIconSize(Qt.QSize(16, 16))
+                    ^^^^^^^^
+AttributeError: type object 'Qt' has no attribute 'QSize'
+2024-12-04 15:41:51,681 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 69, in __init__
+    self.setup_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 101, in setup_ui
+    btn.setIconSize(Qt.QSize(16, 16))
+                    ^^^^^^^^
+AttributeError: type object 'Qt' has no attribute 'QSize'
+2024-12-04 15:42:47,015 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:42:47,063 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:42:47,158 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:42:47,243 - src.utils.git_manager - ERROR - Git command failed: rev-parse --abbrev-ref HEAD
+2024-12-04 15:42:47,286 - main - ERROR - Fatal error occurred: 'GitManager' object has no attribute 'operation_failed'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 70, in __init__
+    self.connect_signals()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 127, in connect_signals
+    self.git_manager.operation_failed.connect(self.show_error)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitManager' object has no attribute 'operation_failed'
+2024-12-04 15:42:47,313 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 70, in __init__
+    self.connect_signals()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 127, in connect_signals
+    self.git_manager.operation_failed.connect(self.show_error)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitManager' object has no attribute 'operation_failed'
+2024-12-04 15:43:34,063 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:43:34,104 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:43:34,191 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:43:34,273 - src.utils.git_manager - ERROR - Git command failed: rev-parse --abbrev-ref HEAD
+2024-12-04 15:43:34,304 - main - ERROR - Fatal error occurred: 'GitManager' object has no attribute 'operation_success'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 70, in __init__
+    self.connect_signals()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 128, in connect_signals
+    self.git_manager.operation_success.connect(self.show_success)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitManager' object has no attribute 'operation_success'
+2024-12-04 15:43:34,331 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 70, in __init__
+    self.connect_signals()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 128, in connect_signals
+    self.git_manager.operation_success.connect(self.show_success)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitManager' object has no attribute 'operation_success'
+2024-12-04 15:44:57,969 - main - INFO - Logging system initialized in debug mode
+2024-12-04 15:44:58,007 - src.utils.lazy_loading - ERROR - Error creating component project_explorer: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+2024-12-04 15:44:58,101 - src.utils.lazy_loading - ERROR - Error creating component git_panel: 'NoneType' object has no attribute 'is_dir'
+2024-12-04 15:44:58,182 - src.utils.git_manager - ERROR - Git command failed: rev-parse --abbrev-ref HEAD
+2024-12-04 15:44:58,212 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 15:44:58,291 - main - ERROR - Fatal error occurred: 'str' object has no attribute 'name'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 71, in __init__
+    self.refresh_status()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 157, in refresh_status
+    item = QTreeWidgetItem([file.name, file.status.name])
+                            ^^^^^^^^^
+AttributeError: 'str' object has no attribute 'name'
+2024-12-04 15:44:58,298 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 48, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 106, in _init_ui
+    git_panel = GitPanel(os.getcwd())
+                ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 71, in __init__
+    self.refresh_status()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\git_panel.py", line 157, in refresh_status
+    item = QTreeWidgetItem([file.name, file.status.name])
+                            ^^^^^^^^^
+AttributeError: 'str' object has no attribute 'name'
+2024-12-04 16:06:42,222 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:06:42,299 - src.utils.lazy_loading - DEBUG - Created component project_explorer
+2024-12-04 16:06:42,344 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'logger'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 129, in _init_git_panel
+    self.git_manager = GitManager(self.project_root, parent=self)
+                       ^^^^^^^^^^
+NameError: name 'GitManager' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 51, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 104, in _init_ui
+    self._init_git_panel()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 133, in _init_git_panel
+    self.logger.error(f"Failed to initialize Git panel: {e}")
+    ^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'logger'. Did you mean: 'lower'?
+2024-12-04 16:06:42,374 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 129, in _init_git_panel
+    self.git_manager = GitManager(self.project_root, parent=self)
+                       ^^^^^^^^^^
+NameError: name 'GitManager' is not defined
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 20, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 51, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 104, in _init_ui
+    self._init_git_panel()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 133, in _init_git_panel
+    self.logger.error(f"Failed to initialize Git panel: {e}")
+    ^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'logger'. Did you mean: 'lower'?
+2024-12-04 16:08:47,826 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:08:47,905 - src.utils.lazy_loading - DEBUG - Created component project_explorer
+2024-12-04 16:10:11,566 - __main__ - INFO - Logging system initialized in debug mode
+2024-12-04 16:10:11,647 - src.utils.lazy_loading - DEBUG - Created component project_explorer
+2024-12-04 16:16:08,174 - __main__ - INFO - Logging system initialized in debug mode
+2024-12-04 16:16:08,256 - src.utils.lazy_loading - DEBUG - Created component project_explorer
+2024-12-04 16:23:29,684 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:23:29,756 - src.utils.lazy_loading - DEBUG - Created component project_explorer
+2024-12-04 16:27:47,216 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:27:47,254 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:27:47,254 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:27:47,254 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:27:47,254 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:27:47,290 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x000001C249845630>
+2024-12-04 16:32:24,997 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:32:25,062 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:32:25,063 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:32:25,064 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:32:25,064 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:32:25,125 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x000001ED717C16D0>
+2024-12-04 16:34:31,753 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:34:31,808 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Components registered
