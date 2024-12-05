@@ -26,6 +26,8 @@ env/
 ENV/
 .env/
 .venv/
+.venv/Lib/site-packages/torch/lib/torch_cpu.dll
+.venv/Lib/site-packages/torch/lib/dnnl.lib
 
 # IDE
 .idea/
@@ -64,3 +66,7 @@ desktop.ini
 *.bak
 temp/
 tmp/
+
+# Large files
+*.dll
+*.lib
