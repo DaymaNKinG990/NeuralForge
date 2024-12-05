@@ -1,7 +1,7 @@
 import sys
-import os
 import logging
 import logging.config
+from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QLoggingCategory, QThread
 from src.ui.main_window import MainWindow
@@ -25,7 +25,7 @@ def main():
     
     try:
         # Создание директории для логов если её нет
-        os.makedirs('logs', exist_ok=True)
+        Path('logs').mkdir(exist_ok=True)
         
         # Инициализация приложения
         app = QApplication(sys.argv)
@@ -35,11 +35,18 @@ def main():
         
         # Создание главного окна
         window = MainWindow()
-        window.show()
         
-        # Убедимся, что окно отображается
+        # Ensure window is properly shown
+        window.show()
         window.raise_()
         window.activateWindow()
+        
+        # Move to screen center
+        screen = app.primaryScreen().geometry()
+        window.move(
+            (screen.width() - window.width()) // 2,
+            (screen.height() - window.height()) // 2
+        )
         
         logger.info("Application started successfully")
         return app.exec()

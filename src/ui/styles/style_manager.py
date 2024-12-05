@@ -1,5 +1,5 @@
 from typing import Dict
-from .style_enums import ThemeType, StyleClass
+from .style_enums import ThemeType, StyleClass, ColorScheme
 from .base_styles import BaseStyles
 from .component_styles import (
     PerformanceMonitorStyles,
@@ -55,3 +55,23 @@ class StyleManager:
             StyleClass.TAB_WIDGET: self.get_editor_style(),
         }
         return style_map.get(style_class, "")
+
+    def get_color(self, color_class: StyleClass) -> str:
+        """Get color value for a style class.
+        
+        Args:
+            color_class: Style class to get color for
+            
+        Returns:
+            str: Color value in hex format
+        """
+        color_map = {
+            StyleClass.EDITOR_BACKGROUND: ColorScheme.EDITOR_BACKGROUND.value,
+            StyleClass.FOREGROUND: ColorScheme.FOREGROUND.value,
+            StyleClass.EDITOR_SELECTION: ColorScheme.EDITOR_SELECTION.value,
+            StyleClass.LINE_NUMBER_BG: ColorScheme.LINE_NUMBER_BG.value,
+            StyleClass.LINE_NUMBER_FG: ColorScheme.LINE_NUMBER_FG.value,
+            StyleClass.EDITOR_CURRENT_LINE: ColorScheme.EDITOR_CURRENT_LINE.value,
+        }
+        
+        return color_map.get(color_class, ColorScheme.FOREGROUND.value)

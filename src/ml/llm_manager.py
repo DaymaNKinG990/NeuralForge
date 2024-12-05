@@ -124,16 +124,29 @@ class LLMManager:
         top_p = top_p or self.default_configs['local']['top_p']
         
         try:
-            inputs = self.local_tokenizer(prompt, return_tensors="pt").to(self.local_model.device)
+            # Tokenize input
+            inputs = self.local_tokenizer(prompt, return_tensors="pt")
             
+            # Move inputs to model device if needed
+            if hasattr(self.local_model, 'device'):
+                inputs = {k: v.to(self.local_model.device) for k, v in inputs.items()}
+            
+            # Generate text
             outputs = self.local_model.generate(
-                **inputs,
+                input_ids=inputs['input_ids'],
+                attention_mask=inputs.get('attention_mask'),
                 max_length=max_length,
                 temperature=temperature,
                 top_p=top_p,
                 do_sample=True,
                 pad_token_id=self.local_tokenizer.eos_token_id
             )
+            
+            # Convert outputs to list if it's a tensor
+            if isinstance(outputs, torch.Tensor):
+                outputs = outputs.tolist()
+            
+            # Decode output
             generated_text = self.local_tokenizer.decode(outputs[0], skip_special_tokens=True)
             self.logger.info("Text generation successful.")
             return generated_text

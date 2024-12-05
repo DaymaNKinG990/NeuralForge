@@ -33,29 +33,36 @@ def test_model_loading(llm_manager):
 
 def test_text_generation(llm_manager):
     """Test text generation functionality"""
-    with patch('src.ml.llm_manager.AutoModelForCausalLM.from_pretrained') as mock_model, \
-         patch('src.ml.llm_manager.AutoTokenizer.from_pretrained') as mock_tokenizer:
-        mock_model_instance = Mock()
-        mock_tokenizer_instance = Mock()
-        
-        # Setup mock tokenizer
-        mock_tokenizer_instance.encode.return_value = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
-        mock_tokenizer_instance.return_tensors = "pt"
-        mock_tokenizer_instance.pad_token_id = 0
-        mock_tokenizer_instance.eos_token_id = 2
-        
-        # Setup mock model
-        mock_model_instance.generate.return_value = torch.tensor([[1, 2, 3]])
-        mock_model_instance.device = torch.device('cpu')
-        
-        mock_tokenizer_instance.decode.return_value = "Generated text"
-        
-        llm_manager.local_model = mock_model_instance
-        llm_manager.local_tokenizer = mock_tokenizer_instance
-        
-        generated_text = llm_manager.generate_local("Test prompt")
-        assert generated_text == "Generated text"
-        mock_model_instance.generate.assert_called_once()
+    # Setup mock model and tokenizer
+    mock_model = Mock()
+    mock_tokenizer = Mock()
+
+    # Configure mock tokenizer
+    input_tokens = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    mock_tokenizer.return_value = input_tokens  # Mock the call behavior
+    mock_tokenizer.return_tensors = "pt"
+    mock_tokenizer.pad_token_id = 0
+    mock_tokenizer.eos_token_id = 2
+    mock_tokenizer.decode.return_value = "Generated text"
+
+    # Configure mock model
+    output_tensor = torch.tensor([[1, 2, 3]])
+    output_tensor.tolist = Mock(return_value=[[1, 2, 3]])
+    mock_model.generate.return_value = output_tensor
+    mock_model.device = torch.device('cpu')
+
+    # Set mocks on llm_manager
+    llm_manager.local_model = mock_model
+    llm_manager.local_tokenizer = mock_tokenizer
+
+    # Test generation
+    result = llm_manager.generate_local("Test prompt")
+    assert result == "Generated text"
+
+    # Verify mock calls
+    assert mock_tokenizer.call_count == 1, "Tokenizer should be called once"
+    assert mock_model.generate.call_count == 1, "Generate should be called once"
+    assert mock_tokenizer.decode.call_count == 1, "Decode should be called once"
 
 def test_error_handling(llm_manager):
     """Test error handling during model loading"""
@@ -78,24 +85,33 @@ def test_batch_generation(llm_manager):
          patch('src.ml.llm_manager.AutoTokenizer.from_pretrained') as mock_tokenizer:
         mock_model_instance = Mock()
         mock_tokenizer_instance = Mock()
-        
+
         # Setup mock tokenizer
-        mock_tokenizer_instance.encode.return_value = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+        input_tokens = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+        mock_tokenizer_instance.return_value = input_tokens  # Mock the call behavior
         mock_tokenizer_instance.return_tensors = "pt"
         mock_tokenizer_instance.pad_token_id = 0
         mock_tokenizer_instance.eos_token_id = 2
-        
+        mock_tokenizer_instance.decode.return_value = "Generated text"
+
         # Setup mock model
-        mock_model_instance.generate.return_value = torch.tensor([[1, 2, 3]])
+        output_tensor = torch.tensor([[1, 2, 3]])
+        output_tensor.tolist = Mock(return_value=[[1, 2, 3]])
+        mock_model_instance.generate.return_value = output_tensor
         mock_model_instance.device = torch.device('cpu')
 
+        # Set up manager
         llm_manager.local_model = mock_model_instance
         llm_manager.local_tokenizer = mock_tokenizer_instance
 
-        mock_tokenizer_instance.decode.return_value = "Generated text"
-
+        # Generate multiple texts
         generated_texts = [llm_manager.generate_local("Test prompt") for _ in range(5)]
         assert all(text == "Generated text" for text in generated_texts)
+
+        # Verify mock calls
+        assert mock_tokenizer_instance.call_count == 5, "Tokenizer should be called 5 times"
+        assert mock_model_instance.generate.call_count == 5, "Generate should be called 5 times"
+        assert mock_tokenizer_instance.decode.call_count == 5, "Decode should be called 5 times"
 
 def test_model_configuration(llm_manager):
     """Test model configuration settings"""
@@ -122,62 +138,88 @@ def test_encode_and_generate(llm_manager):
     mock_tokenizer_instance = Mock()
     mock_model_instance = Mock()
 
-    mock_tokenizer_instance.encode.return_value = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    # Mock tokenizer
+    input_tokens = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    mock_tokenizer_instance.return_value = input_tokens  # Mock the call behavior
     mock_tokenizer_instance.return_tensors = "pt"
     mock_tokenizer_instance.pad_token_id = 0
     mock_tokenizer_instance.eos_token_id = 2
-
-    mock_model_instance.generate.return_value = torch.tensor([[1, 2, 3]])
-    mock_model_instance.device = torch.device('cpu')
-
     mock_tokenizer_instance.decode.return_value = "Generated text"
 
+    # Mock model
+    output_tensor = torch.tensor([[1, 2, 3]])
+    output_tensor.tolist = Mock(return_value=[[1, 2, 3]])
+    mock_model_instance.generate.return_value = output_tensor
+    mock_model_instance.device = torch.device('cpu')
+
+    # Set up manager
     llm_manager.local_model = mock_model_instance
     llm_manager.local_tokenizer = mock_tokenizer_instance
-
+    
+    # Generate text and verify
     generated_text = llm_manager.generate_local("Test prompt")
     assert generated_text == "Generated text"
+    
+    # Verify mock calls
+    assert mock_tokenizer_instance.call_count == 1, "Tokenizer should be called once"
+    assert mock_model_instance.generate.call_count == 1, "Generate should be called once"
+    assert mock_tokenizer_instance.decode.call_count == 1, "Decode should be called once"
 
 def test_batch_generation_encode_and_generate(llm_manager):
     """Test batch text generation"""
     mock_tokenizer_instance = Mock()
     mock_model_instance = Mock()
 
-    mock_tokenizer_instance.encode.return_value = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    # Mock tokenizer
+    input_tokens = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    mock_tokenizer_instance.return_value = input_tokens  # Mock the call behavior
     mock_tokenizer_instance.return_tensors = "pt"
     mock_tokenizer_instance.pad_token_id = 0
     mock_tokenizer_instance.eos_token_id = 2
-
-    mock_model_instance.generate.return_value = torch.tensor([[1, 2, 3]])
-    mock_model_instance.device = torch.device('cpu')
-
     mock_tokenizer_instance.decode.return_value = "Generated text"
 
+    # Mock model
+    output_tensor = torch.tensor([[1, 2, 3]])
+    output_tensor.tolist = Mock(return_value=[[1, 2, 3]])
+    mock_model_instance.generate.return_value = output_tensor
+    mock_model_instance.device = torch.device('cpu')
+
+    # Set up LLM manager
     llm_manager.local_model = mock_model_instance
     llm_manager.local_tokenizer = mock_tokenizer_instance
 
+    # Generate multiple texts
     generated_texts = [llm_manager.generate_local("Test prompt") for _ in range(5)]
     assert all(text == "Generated text" for text in generated_texts)
+
+    # Verify mocks were called correctly
+    assert mock_model_instance.generate.call_count == 5
+    assert mock_tokenizer_instance.decode.call_count == 5
+    assert mock_tokenizer_instance.call_count == 5  # Verify tokenizer was called
 
 def test_encode_and_generate_with_return_values(llm_manager):
     """Test encode and generate methods with return values"""
     mock_tokenizer_instance = Mock()
     mock_model_instance = Mock()
 
-    mock_tokenizer_instance.encode.return_value = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    # Configure mock tokenizer
+    encoded_output = {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
+    mock_tokenizer_instance.return_value = encoded_output  # Configure __call__ behavior
     mock_tokenizer_instance.return_tensors = "pt"
     mock_tokenizer_instance.pad_token_id = 0
     mock_tokenizer_instance.eos_token_id = 2
+    mock_tokenizer_instance.decode.return_value = "Generated text"
 
+    # Configure mock model
     mock_model_instance.generate.return_value = torch.tensor([[1, 2, 3]])
     mock_model_instance.device = torch.device('cpu')
-
-    mock_tokenizer_instance.decode.return_value = "Generated text"
 
     llm_manager.local_model = mock_model_instance
     llm_manager.local_tokenizer = mock_tokenizer_instance
 
     generated_text = llm_manager.generate_local("Test prompt")
     assert generated_text == "Generated text"
-    assert mock_tokenizer_instance.encode.return_value == {'input_ids': torch.tensor([[1, 2, 3]]), 'attention_mask': torch.tensor([[1, 1, 1]])}
-    assert mock_model_instance.generate.return_value == torch.tensor([[1, 2, 3]])
+
+    # Verify mock calls
+    mock_tokenizer_instance.assert_called_once_with("Test prompt", return_tensors="pt")
+    mock_model_instance.generate.assert_called_once()

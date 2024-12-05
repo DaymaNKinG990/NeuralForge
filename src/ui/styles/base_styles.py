@@ -47,8 +47,8 @@ class BaseStyles:
             }}
             
             QDockWidget {{
-                titlebar-close-icon: url(resources/icons/close.svg);
-                titlebar-normal-icon: url(resources/icons/dock.svg);
+                titlebar-close-icon: url(src/ui/resources/icons/close.svg);
+                titlebar-normal-icon: url(src/ui/resources/icons/dock.svg);
             }}
             
             QDockWidget::title {{

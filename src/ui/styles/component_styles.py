@@ -62,15 +62,15 @@ class ProjectExplorerStyles:
             }}
             
             QTreeView::branch:has-siblings:!adjoins-item {{
-                border-image: url(resources/icons/vline.svg) 0;
+                border-image: url(src/ui/resources/icons/vline.svg) 0;
             }}
             
             QTreeView::branch:has-siblings:adjoins-item {{
-                border-image: url(resources/icons/branch-more.svg) 0;
+                border-image: url(src/ui/resources/icons/branch-more.svg) 0;
             }}
             
             QTreeView::branch:!has-children:!has-siblings:adjoins-item {{
-                border-image: url(resources/icons/branch-end.svg) 0;
+                border-image: url(src/ui/resources/icons/branch-end.svg) 0;
             }}
         """
 

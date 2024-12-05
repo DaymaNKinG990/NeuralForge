@@ -1,21 +1,25 @@
-from typing import Optional, List, Dict, Any, Tuple, Set
+from typing import Optional, Dict, Set
 from PyQt6.QtWidgets import (
-    QPlainTextEdit, QWidget, QVBoxLayout, QMenu,
+    QPlainTextEdit, QWidget, QTextEdit, QVBoxLayout, QMenu,
     QDialog, QLabel, QLineEdit, QPushButton, QHBoxLayout,
-    QCheckBox
+    QCheckBox, QFileDialog, QMessageBox
+)
+from PyQt6.QtCore import (
+    Qt, QRect, QSize, pyqtSignal, QPoint,
+    QTimer, QThread
 )
 from PyQt6.QtGui import (
-    QPainter, QTextFormat, QColor, QTextCursor, 
-    QSyntaxHighlighter, QTextCharFormat, QFont, QFontMetrics, QPen,
-    QTextDocument, QPaintEvent, QKeyEvent
+    QColor, QPainter, QTextFormat, QTextCharFormat,
+    QSyntaxHighlighter, QTextDocument, QTextCursor,
+    QPaintEvent, QKeyEvent, QKeySequence, QTextFormat,
+    QFont, QFontMetrics, QPen, QPalette
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QPoint
 from pathlib import Path
+import re
+import chardet
 from ..utils.performance import PerformanceMonitor
 from .styles.style_manager import StyleManager
 from .styles.style_enums import StyleClass, ColorScheme
-import re
-import chardet
 
 class LineNumberArea(QWidget):
     """Widget for displaying line numbers in code editor.
@@ -86,36 +90,70 @@ class PythonHighlighter(QSyntaxHighlighter):
         ]
         rules[r'\b(' + '|'.join(keywords) + r')\b'] = keyword_format
         
+        # Built-ins
+        builtin_format = QTextCharFormat()
+        builtin_format.setForeground(QColor(ColorScheme.SYNTAX_BUILTIN.value))
+        builtins = [
+            'abs', 'all', 'any', 'bin', 'bool', 'bytes', 'callable', 'chr',
+            'classmethod', 'compile', 'complex', 'delattr', 'dict', 'dir',
+            'divmod', 'enumerate', 'eval', 'exec', 'filter', 'float', 'format',
+            'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex',
+            'id', 'input', 'int', 'isinstance', 'issubclass', 'iter', 'len',
+            'list', 'locals', 'map', 'max', 'memoryview', 'min', 'next',
+            'object', 'oct', 'open', 'ord', 'pow', 'print', 'property', 'range',
+            'repr', 'reversed', 'round', 'set', 'setattr', 'slice', 'sorted',
+            'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars',
+            'zip'
+        ]
+        rules[r'\b(' + '|'.join(builtins) + r')\b'] = builtin_format
+        
         # Strings
         string_format = QTextCharFormat()
         string_format.setForeground(QColor(ColorScheme.SYNTAX_STRING.value))
         rules[r'"[^"\\]*(\\.[^"\\]*)*"'] = string_format
         rules[r"'[^'\\]*(\\.[^'\\]*)*'"] = string_format
         
-        # Comments
-        comment_format = QTextCharFormat()
-        comment_format.setForeground(QColor(ColorScheme.SYNTAX_COMMENT.value))
-        rules[r'#[^\n]*'] = comment_format
-        
-        # Functions
-        function_format = QTextCharFormat()
-        function_format.setForeground(QColor(ColorScheme.SYNTAX_FUNCTION.value))
-        rules[r'\bdef\s+(\w+)'] = function_format
-        
-        # Classes
-        class_format = QTextCharFormat()
-        class_format.setForeground(QColor(ColorScheme.SYNTAX_CLASS.value))
-        rules[r'\bclass\s+(\w+)'] = class_format
-        
         # Numbers
         number_format = QTextCharFormat()
         number_format.setForeground(QColor(ColorScheme.SYNTAX_NUMBER.value))
         rules[r'\b\d+\b'] = number_format
         
+        # Comments
+        comment_format = QTextCharFormat()
+        comment_format.setForeground(QColor(ColorScheme.SYNTAX_COMMENT.value))
+        comment_format.setFontItalic(True)
+        rules[r'#[^\n]*'] = comment_format
+        
+        # Function definitions
+        function_format = QTextCharFormat()
+        function_format.setForeground(QColor(ColorScheme.SYNTAX_FUNCTION.value))
+        rules[r'\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\b'] = function_format
+        
+        # Class definitions
+        class_format = QTextCharFormat()
+        class_format.setForeground(QColor(ColorScheme.SYNTAX_CLASS.value))
+        class_format.setFontWeight(QFont.Weight.Bold)
+        rules[r'\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\b'] = class_format
+        
         # Decorators
         decorator_format = QTextCharFormat()
         decorator_format.setForeground(QColor(ColorScheme.SYNTAX_DECORATOR.value))
-        rules[r'@\w+'] = decorator_format
+        rules[r'@[A-Za-z_][A-Za-z0-9_]*'] = decorator_format
+        
+        # Operators
+        operator_format = QTextCharFormat()
+        operator_format.setForeground(QColor(ColorScheme.SYNTAX_OPERATOR.value))
+        operators = [
+            '=', '==', '!=', '<', '<=', '>', '>=', r'\+', '-', r'\*', '/',
+            '//', r'\*\*', '%', '@', r'\+=', '-=', r'\*=', '/=', '//=',
+            r'\*\*=', '%=', '@=', '&=', r'\|=', r'\^=', '>>=', '<<=', r'\+\+'
+        ]
+        rules[r'(' + '|'.join(operators) + r')'] = operator_format
+        
+        # Constants
+        constant_format = QTextCharFormat()
+        constant_format.setForeground(QColor(ColorScheme.SYNTAX_CONSTANT.value))
+        rules[r'\b[A-Z_][A-Z0-9_]*\b'] = constant_format
         
         return rules
         
@@ -151,38 +189,153 @@ class CodeEditor(QPlainTextEdit):
             parent: Parent widget
         """
         super().__init__(parent)
-        self.line_number_area = LineNumberArea(self)
-        self.highlighter = PythonHighlighter(self.document())
-        self.style_manager = StyleManager()
+        
+        # Initialize basic properties
         self.zoom_level = 0
         self.matching_brackets = {'{': '}', '[': ']', '(': ')'}
         self.encoding = 'utf-8'
         
+        # Create components
+        self.line_number_area = LineNumberArea(self)
+        self.highlighter = PythonHighlighter(self.document())
+        self.style_manager = StyleManager()
+        
+        # Initialize UI and connect signals
         self._init_ui()
         self._apply_styles()
         self._connect_signals()
         self._setup_shortcuts()
+        
+    def setText(self, text: str) -> None:
+        """Set the text content of the editor.
+        
+        This method is provided for compatibility with QTextEdit interface.
+        Internally it calls setPlainText.
+        
+        Args:
+            text: Text content to set
+        """
+        self.setPlainText(text)
+        
+    def _init_ui(self):
+        """Initialize the editor UI components."""
+        # Set default font
+        font = QFont("Consolas", 10)
+        font.setFixedPitch(True)
+        self.setFont(font)
+        
+        # Set line wrapping
+        self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        
+        # Set up line numbers
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+        self.blockCountChanged.connect(self.update_line_number_area_width)
+        self.updateRequest.connect(self.update_line_number_area)
+        self.cursorPositionChanged.connect(self.highlight_current_line)
+        self.cursorPositionChanged.connect(self._emit_cursor_position)
+        
+        # Set tab stop width
+        self.setTabStopDistance(self.fontMetrics().horizontalAdvance(' ') * 4)
+        
+        # Initial highlighting
+        self.highlight_current_line()
+        
+    def _apply_styles(self):
+        """Apply default styles to the editor."""
+        # Set background color
+        palette = self.palette()
+        bg_color = QColor(self.style_manager.get_color(StyleClass.EDITOR_BACKGROUND))
+        palette.setColor(QPalette.ColorRole.Base, bg_color)
+        self.setPalette(palette)
+        
+        # Set text color
+        text_color = QColor(self.style_manager.get_color(StyleClass.FOREGROUND))
+        palette.setColor(QPalette.ColorRole.Text, text_color)
+        self.setPalette(palette)
+        
+        # Set line number area background
+        line_number_palette = self.line_number_area.palette()
+        line_number_bg = QColor(ColorScheme.LINE_NUMBER_BG.value)
+        line_number_fg = QColor(ColorScheme.LINE_NUMBER_FG.value)
+        line_number_palette.setColor(QPalette.ColorRole.Base, line_number_bg)
+        line_number_palette.setColor(QPalette.ColorRole.Text, line_number_fg)
+        self.line_number_area.setPalette(line_number_palette)
+        
+        # Set selection color
+        selection_color = QColor(self.style_manager.get_color(StyleClass.EDITOR_SELECTION))
+        palette.setColor(QPalette.ColorRole.Highlight, selection_color)
+        self.setPalette(palette)
 
-    def _setup_shortcuts(self) -> None:
-        """Set up keyboard shortcuts for editor actions."""
-        # Zoom shortcuts
-        self.zoom_in_action = self.addAction("Zoom In")
-        self.zoom_in_action.setShortcut("Ctrl++")
-        self.zoom_in_action.triggered.connect(self.zoom_in)
+    def _connect_signals(self) -> None:
+        """Connect editor signals to slots."""
+        self.blockCountChanged.connect(self.update_line_number_area_width)
+        self.updateRequest.connect(self.update_line_number_area)
+        self.cursorPositionChanged.connect(self.highlight_current_line)
+        self.cursorPositionChanged.connect(self._emit_cursor_position)
+        self.textChanged.connect(self.highlight_matching_brackets)
         
-        self.zoom_out_action = self.addAction("Zoom Out")
-        self.zoom_out_action.setShortcut("Ctrl+-")
-        self.zoom_out_action.triggered.connect(self.zoom_out)
+    def _emit_cursor_position(self) -> None:
+        """Emit the current cursor position."""
+        cursor = self.textCursor()
+        line = cursor.blockNumber() + 1
+        column = cursor.columnNumber() + 1
+        self.cursor_position_changed.emit(line, column)
         
-        # Find/Replace shortcuts
-        self.find_action = self.addAction("Find")
-        self.find_action.setShortcut("Ctrl+F")
-        self.find_action.triggered.connect(self.show_find_dialog)
+    def update_line_number_area_width(self, _: int) -> None:
+        """Update the editor's viewport margins when line number width changes."""
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
         
-        self.replace_action = self.addAction("Replace")
-        self.replace_action.setShortcut("Ctrl+H")
-        self.replace_action.triggered.connect(self.show_replace_dialog)
-
+    def line_number_area_width(self) -> int:
+        """Calculate width needed for the line number area.
+        
+        Returns:
+            int: Width in pixels for the line number area
+        """
+        digits = len(str(max(1, self.blockCount())))
+        space = 3 + self.fontMetrics().horizontalAdvance('9') * digits
+        return space
+        
+    def update_line_number_area(self, rect: QRect, dy: int) -> None:
+        """Update the line number area when the editor viewport scrolls.
+        
+        Args:
+            rect: Rectangle that needs to be updated
+            dy: Amount of vertical scroll
+        """
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(0, rect.y(), 
+                                       self.line_number_area.width(), rect.height())
+            
+        if rect.contains(self.viewport().rect()):
+            self.update_line_number_area_width(0)
+            
+    def resizeEvent(self, event: QPaintEvent) -> None:
+        """Handle resize events to adjust line number area.
+        
+        Args:
+            event: Resize event details
+        """
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(
+            QRect(cr.left(), cr.top(),
+                  self.line_number_area_width(), cr.height())
+        )
+        
+    def highlight_current_line(self) -> None:
+        """Highlight the current line in the editor."""
+        if not self.isReadOnly():
+            selection = QTextEdit.ExtraSelection()
+            line_color = QColor(self.style_manager.get_color(StyleClass.EDITOR_CURRENT_LINE))
+            selection.format.setBackground(line_color)
+            selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+            selection.cursor = self.textCursor()
+            selection.cursor.clearSelection()
+            
+            self.setExtraSelections([selection])
+        
     def zoom_in(self) -> None:
         """Increase the font size."""
         if self.zoom_level < 20:  # Maximum zoom level
@@ -249,87 +402,99 @@ class CodeEditor(QPlainTextEdit):
         if event.text() in self.matching_brackets.values() or event.text() in self.matching_brackets:
             self.highlight_matching_brackets()
 
-    def highlight_matching_brackets(self) -> None:
-        """Highlight matching bracket pairs."""
+    def highlight_matching_brackets(self):
+        """Highlight matching brackets in the editor."""
         cursor = self.textCursor()
-        pos = cursor.position()
-        document = self.document()
         
         # Clear existing bracket selections
-        for selection in cursor.document().allSelections():
-            cursor.removeSelection()
+        self.bracket_selections = []
         
-        # Check character under cursor
-        char = document.characterAt(pos - 1)
-        if char in self.matching_brackets or char in self.matching_brackets.values():
-            self._find_and_highlight_matching_bracket(pos - 1, char)
-
-    def _find_and_highlight_matching_bracket(self, pos: int, char: str) -> None:
-        """Find and highlight the matching bracket for the given position.
+        # Get current position
+        pos = cursor.position()
+        block = cursor.block()
+        text = block.text()
         
-        Args:
-            pos: Position of the first bracket
-            char: Bracket character to match
-        """
-        document = self.document()
-        if char in self.matching_brackets:
-            # Search forward for closing bracket
-            stack = [char]
-            i = pos + 1
-            while i < document.characterCount():
-                c = document.characterAt(i)
-                if c == char:
-                    stack.append(c)
-                elif c == self.matching_brackets[char]:
-                    stack.pop()
-                    if not stack:
-                        self._highlight_bracket_pair(pos, i)
-                        break
-                i += 1
-        else:
-            # Search backward for opening bracket
-            opening_bracket = next(k for k, v in self.matching_brackets.items() if v == char)
-            stack = [char]
-            i = pos - 1
-            while i >= 0:
-                c = document.characterAt(i)
-                if c == char:
-                    stack.append(c)
-                elif c == opening_bracket:
-                    stack.pop()
-                    if not stack:
-                        self._highlight_bracket_pair(i, pos)
-                        break
-                i -= 1
-
-    def _highlight_bracket_pair(self, pos1: int, pos2: int) -> None:
-        """Highlight a pair of matching brackets.
+        # Check for brackets at current position and position-1
+        positions_to_check = [pos - block.position()]
+        if pos > 0:
+            positions_to_check.append(pos - block.position() - 1)
+            
+        for check_pos in positions_to_check:
+            if 0 <= check_pos < len(text):
+                char = text[check_pos]
+                if char in '([{':
+                    # Find matching closing bracket
+                    cursor.setPosition(block.position() + check_pos)
+                    if cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor):
+                        self.bracket_selections.append(QTextEdit.ExtraSelection())
+                        self.bracket_selections[-1].cursor = cursor
+                        self.bracket_selections[-1].format.setBackground(QColor("#3E4451"))
+                        
+                    # Find and highlight closing bracket
+                    doc = self.document()
+                    pos = block.position() + check_pos
+                    stack = [char]
+                    pos += 1
+                    
+                    while pos < doc.characterCount() and stack:
+                        cursor = QTextCursor(doc)
+                        cursor.setPosition(pos)
+                        char = cursor.document().characterAt(pos)
+                        
+                        if char in '([{':
+                            stack.append(char)
+                        elif char in ')]}':
+                            if (char == ')' and stack[-1] == '(' or
+                                char == ']' and stack[-1] == '[' or
+                                char == '}' and stack[-1] == '{'):
+                                stack.pop()
+                                if not stack:  # Found matching bracket
+                                    cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+                                    self.bracket_selections.append(QTextEdit.ExtraSelection())
+                                    self.bracket_selections[-1].cursor = cursor
+                                    self.bracket_selections[-1].format.setBackground(QColor("#3E4451"))
+                                    break
+                        pos += 1
+                        
+                elif char in ')]}':
+                    # Find matching opening bracket
+                    cursor.setPosition(block.position() + check_pos)
+                    if cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor):
+                        self.bracket_selections.append(QTextEdit.ExtraSelection())
+                        self.bracket_selections[-1].cursor = cursor
+                        self.bracket_selections[-1].format.setBackground(QColor("#3E4451"))
+                        
+                    # Find and highlight opening bracket
+                    doc = self.document()
+                    pos = block.position() + check_pos
+                    stack = [char]
+                    pos -= 1
+                    
+                    while pos >= 0 and stack:
+                        cursor = QTextCursor(doc)
+                        cursor.setPosition(pos)
+                        char = cursor.document().characterAt(pos)
+                        
+                        if char in ')]}':
+                            stack.append(char)
+                        elif char in '([{':
+                            if (char == '(' and stack[-1] == ')' or
+                                char == '[' and stack[-1] == ']' or
+                                char == '{' and stack[-1] == '}'):
+                                stack.pop()
+                                if not stack:  # Found matching bracket
+                                    cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+                                    self.bracket_selections.append(QTextEdit.ExtraSelection())
+                                    self.bracket_selections[-1].cursor = cursor
+                                    self.bracket_selections[-1].format.setBackground(QColor("#3E4451"))
+                                    break
+                        pos -= 1
         
-        Args:
-            pos1: Position of first bracket
-            pos2: Position of second bracket
-        """
-        format = QTextCharFormat()
-        format.setBackground(QColor(ColorScheme.EDITOR_MATCHING_BRACKET.value))
-        format.setForeground(QColor(ColorScheme.FOREGROUND.value))
-        
-        cursor = self.textCursor()
-        
-        # Highlight first bracket
-        cursor.setPosition(pos1)
-        cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
-        selection = QTextEdit.ExtraSelection()
-        selection.format = format
-        selection.cursor = cursor
-        
-        # Highlight second bracket
-        cursor.setPosition(pos2)
-        cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
-        selection2 = QTextEdit.ExtraSelection()
-        selection2.format = format
-        selection2.cursor = cursor
-        
-        self.setExtraSelections([selection, selection2])
+        # Apply all selections
+        if self.bracket_selections:
+            all_selections = self.extraSelections()
+            all_selections.extend(self.bracket_selections)
+            self.setExtraSelections(all_selections)
 
     def show_find_dialog(self) -> None:
         """Show the find dialog."""
@@ -340,6 +505,90 @@ class CodeEditor(QPlainTextEdit):
         """Show the find and replace dialog."""
         dialog = ReplaceDialog(self)
         dialog.exec()
+
+    def _setup_shortcuts(self) -> None:
+        """Set up keyboard shortcuts for editor actions."""
+        # Zoom shortcuts
+        self.zoom_in_action = self.addAction("Zoom In")
+        self.zoom_in_action.setShortcut("Ctrl++")
+        self.zoom_in_action.triggered.connect(self.zoom_in)
+        
+        self.zoom_out_action = self.addAction("Zoom Out")
+        self.zoom_out_action.setShortcut("Ctrl+-")
+        self.zoom_out_action.triggered.connect(self.zoom_out)
+        
+        # Find/Replace shortcuts
+        self.find_action = self.addAction("Find")
+        self.find_action.setShortcut("Ctrl+F")
+        self.find_action.triggered.connect(self.show_find_dialog)
+        
+        self.replace_action = self.addAction("Replace")
+        self.replace_action.setShortcut("Ctrl+H")
+        self.replace_action.triggered.connect(self.show_replace_dialog)
+
+    def show_context_menu(self, pos):
+        """Show the context menu at the given position.
+        
+        Args:
+            pos: Position to show menu at
+        """
+        menu = QMenu(self)
+        
+        # Add standard actions
+        menu.addAction("Cut", self.cut)
+        menu.addAction("Copy", self.copy)
+        menu.addAction("Paste", self.paste)
+        menu.addSeparator()
+        menu.addAction("Select All", self.selectAll)
+        
+        # Show menu at cursor position
+        menu.exec(self.mapToGlobal(pos))
+
+    def line_number_area_paint_event(self, event: QPaintEvent) -> None:
+        """Paint the line number area.
+        
+        Args:
+            event: Paint event details
+        """
+        painter = QPainter(self.line_number_area)
+        bg_color = QColor(ColorScheme.LINE_NUMBER_BG.value)
+        painter.fillRect(event.rect(), bg_color)
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + round(self.blockBoundingRect(block).height())
+        font_metrics = self.fontMetrics()
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(block_number + 1)
+                painter.setPen(QColor(ColorScheme.LINE_NUMBER_FG.value))
+                # Create a QRect for the text area
+                text_rect = QRect(0, top, self.line_number_area.width(), font_metrics.height())
+                painter.drawText(text_rect, Qt.AlignmentFlag.AlignRight, number)
+
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
+            block_number += 1
+
+    def closeEvent(self, event):
+        """Handle cleanup when editor is closed."""
+        try:
+            # Cleanup highlighter
+            if hasattr(self, 'highlighter') and self.highlighter:
+                self.highlighter.setDocument(None)
+                self.highlighter.deleteLater()
+            
+            # Cleanup line number area
+            if hasattr(self, 'line_number_area') and self.line_number_area:
+                self.line_number_area.deleteLater()
+            
+            # Call parent's closeEvent
+            super().closeEvent(event)
+        except RuntimeError:
+            pass  # Object may already be deleted
 
 class FindDialog(QDialog):
     """Dialog for finding text in the editor."""

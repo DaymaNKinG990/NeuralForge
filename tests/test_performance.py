@@ -73,25 +73,43 @@ def test_performance_report(performance_monitor):
 
 def test_performance_threshold_warnings(performance_monitor, qtbot):
     """Test performance threshold warnings through warning_triggered signal"""
-    def check_warning(warning):
-        assert "High memory usage" in warning or "High CPU usage" in warning
+    warnings_received = []
+    
+    def handle_warning(warning):
+        warnings_received.append(warning)
+    
+    # Connect signal handler
+    performance_monitor.warning_triggered.connect(handle_warning)
+    
+    # Create mock process
+    mock_proc = Mock()
+    mock_proc.cpu_percent.side_effect = [0.0, 75.0]  # First call returns 0, second call returns 75%
+    mock_proc.memory_percent.return_value = 85.0  # High memory usage
+    mock_proc.num_threads.return_value = 4
+    mock_proc.io_counters.return_value = Mock(_asdict=lambda: {})
 
-    with qtbot.waitSignal(performance_monitor.warning_triggered, timeout=1000, raising=True) as blocker:
-        # Simulate high resource usage
-        with patch('psutil.Process') as mock_process:
-            mock_proc = Mock()
-            mock_proc.memory_percent.return_value = 85.0  # High memory usage
-            mock_proc.cpu_percent.return_value = 75.0     # High CPU usage
-            mock_process.return_value = mock_proc
-            
-            # Ensure the signal is connected and emits a warning
-            def emit_warning(warning):
-                print(warning)
-                return warning
-            performance_monitor.warning_triggered.connect(emit_warning)
-
-            performance_monitor.update_stats()
-            check_warning(blocker.args[0])
+    # Set up process mock
+    with patch('psutil.virtual_memory') as mock_vmem:
+        mock_vmem.return_value = Mock(_asdict=lambda: {})
+        
+        # Set the mock process directly
+        performance_monitor.process = mock_proc
+        
+        # Initialize CPU monitoring
+        performance_monitor.process.cpu_percent()
+        
+        # Create signal watchers
+        with qtbot.waitSignal(performance_monitor.warning_triggered, timeout=1000) as blocker1:
+            with qtbot.waitSignal(performance_monitor.warning_triggered, timeout=1000) as blocker2:
+                performance_monitor.update_stats()
+        
+        # Verify warnings
+        assert len(warnings_received) == 2, "Expected 2 warnings (CPU and memory)"
+        assert any("CPU usage" in w for w in warnings_received), "No CPU warning received"
+        assert any("memory usage" in w for w in warnings_received), "No memory warning received"
+        
+    # Cleanup
+    performance_monitor.warning_triggered.disconnect(handle_warning)
 
 def test_concurrent_monitoring(qtbot):
     """Test concurrent performance monitoring"""

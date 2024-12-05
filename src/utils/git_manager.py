@@ -7,7 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread, QCoreApplication
 import logging
 from datetime import datetime
 import git
-from git import Repo, GitCommandError, InvalidGitRepositoryError
+from git import Repo, GitCommandError, InvalidGitRepositoryError, NoSuchPathError
 
 class FileStatus(Enum):
     """Git file status types."""
@@ -51,6 +51,7 @@ class GitManager(QObject):
     
     Attributes:
         project_path: Path to the Git repository
+        repo: The Git repository instance
         status_changed: Signal emitted when repository status changes
         error_occurred: Signal emitted when an error occurs
         operation_success: Signal emitted when an operation is successful
@@ -82,39 +83,90 @@ class GitManager(QObject):
         except GitError as e:
             self.error_occurred.emit(str(e))
             
+    @property
+    def repo(self) -> Optional[Repo]:
+        """Get the Git repository instance.
+        
+        Returns:
+            The Git repository instance or None if not initialized
+        """
+        return self._repo
+
     def moveToThread(self, thread: QThread):
         """Override moveToThread to ensure proper thread affinity for timers."""
         super().moveToThread(thread)
         # If we have any timers, they should be recreated here
         
     def _ensure_repo(self) -> None:
-        """Ensure Git repository exists."""
+        """Ensure Git repository exists and is properly initialized."""
         try:
-            if not self._repo:
-                self._repo = Repo(str(self.project_path))
-        except InvalidGitRepositoryError:
+            if not self.project_path.exists():
+                raise GitRepositoryError(f"Repository path does not exist: {self.project_path}")
+            
             try:
+                self._repo = Repo(str(self.project_path))
+            except (InvalidGitRepositoryError, NoSuchPathError) as e:
+                if isinstance(e, NoSuchPathError):
+                    raise GitRepositoryError(f"Repository path does not exist: {self.project_path}")
+                # Initialize new repo if it's not a Git repo yet
                 self._ensure_git_repo()
                 self._repo = Repo(str(self.project_path))
-            except Exception as e:
-                raise GitError(f"Failed to initialize Git repository: {str(e)}")
+                
+            if not self._repo:
+                raise GitRepositoryError("Failed to initialize repository")
+                
+            # Ensure we have an initial commit
+            if not any(self._repo.heads):
+                self._run_git_command('add', '.')
+                try:
+                    self._run_git_command('commit', '-m', 'Initial commit')
+                except GitCommandError as e:
+                    if 'nothing to commit' not in str(e):
+                        raise
+                
+        except GitRepositoryError:
+            raise
+        except Exception as e:
+            raise GitRepositoryError(f"Failed to initialize Git repository: {str(e)}")
                 
     def _ensure_git_repo(self) -> None:
         """Ensure the project directory is a Git repository.
 
         This method checks if the project directory contains a .git folder.
-        If not, it initializes a new Git repository in the project directory.
+        If not, it initializes a new Git repository in the project directory
+        and creates an initial commit if there are files to commit.
 
         Raises:
             GitError: If Git repository initialization fails
         """
         try:
             if not (self.project_path / '.git').is_dir():
+                # Initialize repository
                 self._run_git_command('init')
-                self._run_git_command('add', '.')
-                self._run_git_command('commit', '-m', 'Initial commit')
-                self.operation_success.emit("Initialized new Git repository")
-        except Exception as e:
+                
+                # Configure Git user if not already configured
+                try:
+                    self._run_git_command('config', 'user.email')
+                except GitCommandError:
+                    self._run_git_command('config', '--local', 'user.email', 'neuralforge@example.com')
+                try:
+                    self._run_git_command('config', 'user.name')
+                except GitCommandError:
+                    self._run_git_command('config', '--local', 'user.name', 'NeuralForge')
+                    
+                # Add all files and create initial commit
+                files = list(self.project_path.glob('*'))
+                if files:  # Only commit if there are files
+                    self._run_git_command('add', '.')
+                    try:
+                        self._run_git_command('commit', '-m', 'Initial commit')
+                    except GitCommandError as e:
+                        if 'nothing to commit' not in str(e):
+                            raise
+                
+                self.operation_success.emit("Git repository initialized")
+                
+        except GitCommandError as e:
             raise GitError(f"Failed to initialize Git repository: {str(e)}")
 
     def _run_git_command(self, *args: str) -> Tuple[str, str]:
@@ -129,6 +181,12 @@ class GitManager(QObject):
         Raises:
             GitCommandError: If the Git command fails
         """
+        # Skip repository check for init command
+        if args[0] != 'init':
+            # Ensure repository exists before running command
+            if not (self.project_path / '.git').is_dir():
+                raise GitCommandError("Not a Git repository")
+        
         try:
             process = subprocess.Popen(
                 ['git'] + list(args),
@@ -145,7 +203,7 @@ class GitManager(QObject):
             return stdout.strip(), stderr.strip()
             
         except subprocess.CalledProcessError as e:
-            raise GitCommandError(f"Git command failed: {e.stderr.strip()}")
+            raise GitCommandError(f"Git command failed: {e.stderr.strip() if hasattr(e, 'stderr') else str(e)}")
         except Exception as e:
             raise GitCommandError(f"Failed to execute Git command: {str(e)}")
 
@@ -671,3 +729,12 @@ class GitManager(QObject):
             
         except Exception as e:
             raise GitError(f"Failed to get commit history: {str(e)}")
+
+    def __del__(self):
+        """Clean up Git repository when manager is destroyed."""
+        try:
+            if self._repo:
+                self._repo.close()
+                self._repo = None
+        except:
+            pass  # Ignore cleanup errors

@@ -21,3 +21,4 @@ pytest-cov>=3.0.0
 gitpython>=3.1.0
 chardet>=5.0.0
 pytest-qt
+pytest-mock>=3.10.0

@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                          QLineEdit, QPushButton, QFileDialog, QMessageBox)
+                          QLineEdit, QPushButton, QFileDialog, QMessageBox, QDialogButtonBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from ..styles.style_manager import StyleManager
 from ..styles.style_enums import ColorScheme, StyleClass
@@ -19,8 +19,15 @@ class CloneDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)  # Ensure cleanup
         self.style_manager = StyleManager()
-        self.git_manager = GitManager()
+        
+        # Default to user's home directory for cloning
+        self.default_clone_path = Path.home() / 'Projects'
+        self.default_clone_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize GitManager with default path
+        self.git_manager = GitManager(self.default_clone_path)
         
         self.setWindowTitle("Clone Repository")
         self.setModal(True)
@@ -46,19 +53,20 @@ class CloneDialog(QDialog):
                 border-radius: 3px;
             }}
             QLineEdit:focus {{
-                border: 1px solid {ColorScheme.INPUT_BORDER_FOCUS.value};
+                border: 1px solid {ColorScheme.INPUT_FOCUS_BORDER.value};
             }}
         """)
         url_layout.addWidget(url_label)
         url_layout.addWidget(self.url_input)
+        layout.addLayout(url_layout)
         
-        # Target directory input
+        # Directory selection
         dir_layout = QHBoxLayout()
-        dir_label = QLabel("Target Directory:")
+        dir_label = QLabel("Clone to:")
         dir_label.setStyleSheet(f"color: {ColorScheme.FOREGROUND.value};")
-        self.dir_input = QLineEdit()
-        self.dir_input.setPlaceholderText("Select directory to clone into...")
-        self.dir_input.setStyleSheet(f"""
+        self.directory_input = QLineEdit()
+        self.directory_input.setText(str(self.default_clone_path))
+        self.directory_input.setStyleSheet(f"""
             QLineEdit {{
                 background: {ColorScheme.INPUT_BACKGROUND.value};
                 color: {ColorScheme.FOREGROUND.value};
@@ -67,15 +75,15 @@ class CloneDialog(QDialog):
                 border-radius: 3px;
             }}
             QLineEdit:focus {{
-                border: 1px solid {ColorScheme.INPUT_BORDER_FOCUS.value};
+                border: 1px solid {ColorScheme.INPUT_FOCUS_BORDER.value};
             }}
         """)
-        
-        browse_btn = QPushButton("Browse...")
-        browse_btn.setStyleSheet(f"""
+        self.browse_button = QPushButton("Browse...")
+        self.browse_button.clicked.connect(self.browse_directory)
+        self.browse_button.setStyleSheet(f"""
             QPushButton {{
                 background: {ColorScheme.BUTTON_BACKGROUND.value};
-                color: {ColorScheme.FOREGROUND.value};
+                color: {ColorScheme.BUTTON_TEXT.value};
                 border: 1px solid {ColorScheme.BUTTON_BORDER.value};
                 padding: 5px 10px;
                 border-radius: 3px;
@@ -83,164 +91,85 @@ class CloneDialog(QDialog):
             QPushButton:hover {{
                 background: {ColorScheme.BUTTON_HOVER.value};
             }}
-            QPushButton:pressed {{
-                background: {ColorScheme.BUTTON_PRESSED.value};
+            QPushButton:disabled {{
+                background: {ColorScheme.BUTTON_DISABLED.value};
+                color: {ColorScheme.MENU_BORDER.value};
             }}
         """)
-        browse_btn.clicked.connect(self._browse_directory)
-        
         dir_layout.addWidget(dir_label)
-        dir_layout.addWidget(self.dir_input)
-        dir_layout.addWidget(browse_btn)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {ColorScheme.BUTTON_BACKGROUND.value};
-                color: {ColorScheme.FOREGROUND.value};
-                border: 1px solid {ColorScheme.BUTTON_BORDER.value};
-                padding: 5px 15px;
-                border-radius: 3px;
-                min-width: 80px;
-            }}
-            QPushButton:hover {{
-                background: {ColorScheme.BUTTON_HOVER.value};
-            }}
-            QPushButton:pressed {{
-                background: {ColorScheme.BUTTON_PRESSED.value};
-            }}
-        """)
-        cancel_btn.clicked.connect(self.reject)
-        
-        clone_btn = QPushButton("Clone")
-        clone_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: {ColorScheme.PRIMARY_BUTTON.value};
-                color: white;
-                border: none;
-                padding: 5px 15px;
-                border-radius: 3px;
-                min-width: 80px;
-            }}
-            QPushButton:hover {{
-                background: {ColorScheme.PRIMARY_BUTTON_HOVER.value};
-            }}
-            QPushButton:pressed {{
-                background: {ColorScheme.PRIMARY_BUTTON_PRESSED.value};
-            }}
-        """)
-        clone_btn.clicked.connect(self._handle_clone)
-        
-        button_layout.addWidget(cancel_btn)
-        button_layout.addWidget(clone_btn)
-        
-        # Add all layouts
-        layout.addLayout(url_layout)
+        dir_layout.addWidget(self.directory_input)
+        dir_layout.addWidget(self.browse_button)
         layout.addLayout(dir_layout)
+        
+        # Dialog buttons
+        button_layout = QHBoxLayout()
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        button_layout.addWidget(self.button_box)
         layout.addLayout(button_layout)
         
-        # Set dialog style
-        self.setStyleSheet(f"""
-            QDialog {{
-                background: {ColorScheme.DIALOG_BACKGROUND.value};
-                min-width: 500px;
-            }}
-        """)
-        
-    def _browse_directory(self) -> None:
-        """Open file dialog to select target directory.
-        
-        This method opens a file dialog for the user to select a target directory.
-        The selected directory path is then set as the text of the target directory input field.
-        """
+    def browse_directory(self) -> None:
+        """Open directory selection dialog."""
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Select Target Directory",
-            str(Path.home()),
+            "Select Clone Directory",
+            str(self.default_clone_path),
             QFileDialog.Option.ShowDirsOnly
         )
         if directory:
-            self.dir_input.setText(directory)
-    
-    def _validate_inputs(self) -> Tuple[bool, Optional[str]]:
-        """Validate user inputs.
-        
-        This method checks if the user inputs are valid. It checks for the following conditions:
-        - Repository URL is not empty
-        - Target directory is not empty
-        - Repository URL ends with '.git'
-        - Target directory exists
-        - Target directory is a directory
-        - Target directory is empty
-        
-        Args:
-            None
+            self.directory_input.setText(directory)
+            # Update GitManager with new path
+            self.git_manager = GitManager(Path(directory))
+            
+    def validate_inputs(self) -> bool:
+        """Validate user inputs before proceeding.
         
         Returns:
-            Tuple containing:
-                - Boolean indicating if inputs are valid
-                - Error message if inputs are invalid, None otherwise
+            bool: True if inputs are valid, False otherwise
         """
-        url = self.url_input.text().strip()
-        directory = self.dir_input.text().strip()
+        if not self.url_input.text().strip():
+            QMessageBox.warning(self, "Invalid Input", "Please enter a repository URL")
+            return False
+            
+        directory = Path(self.directory_input.text().strip())
+        if not directory.parent.exists():
+            QMessageBox.warning(self, "Invalid Directory", 
+                              "The selected directory's parent does not exist")
+            return False
+            
+        return True
         
-        if not url:
-            return False, "Please enter a repository URL"
-        
-        if not directory:
-            return False, "Please select a target directory"
-        
-        if not url.endswith('.git'):
-            return False, "Invalid repository URL. Must end with .git"
-        
-        target_path = Path(directory)
-        if not target_path.exists():
-            return False, "Target directory does not exist"
-        
-        if not target_path.is_dir():
-            return False, "Selected path is not a directory"
-        
-        if any(target_path.iterdir()):
-            return False, "Target directory must be empty"
-        
-        return True, None
-        
-    def _handle_clone(self) -> None:
-        """Handle repository cloning process."""
-        is_valid, error_msg = self._validate_inputs()
-        
-        if not is_valid:
-            QMessageBox.warning(
-                self,
-                "Invalid Input",
-                error_msg,
-                QMessageBox.StandardButton.Ok
-            )
+    def accept(self) -> None:
+        """Handle dialog acceptance."""
+        if not self.validate_inputs():
             return
             
-        url = self.url_input.text().strip()
-        directory = self.dir_input.text().strip()
-        
         try:
-            self.git_manager.clone_repository(url, directory)
-            self.clone_completed.emit(directory)
-            self.accept()
+            # Get repository name from URL
+            repo_url = self.url_input.text().strip()
+            repo_name = repo_url.split('/')[-1].replace('.git', '')
+            
+            # Create full clone path
+            clone_path = Path(self.directory_input.text().strip()) / repo_name
+            
+            # Update GitManager with final path
+            self.git_manager = GitManager(clone_path)
+            
+            # Clone repository
+            self.git_manager.clone_repository(repo_url)
+            
+            self.clone_completed.emit(str(clone_path))
+            super().accept()
             
         except GitError as e:
-            QMessageBox.critical(
-                self,
-                "Clone Failed",
-                f"Failed to clone repository:\n{str(e)}",
-                QMessageBox.StandardButton.Ok
-            )
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Unexpected Error",
-                f"An unexpected error occurred:\n{str(e)}",
-                QMessageBox.StandardButton.Ok
-            )
+            QMessageBox.critical(self, "Clone Error", str(e))
+
+    def closeEvent(self, event) -> None:
+        """Handle dialog close event."""
+        if self.git_manager:
+            if hasattr(self.git_manager, '_repo') and self.git_manager._repo:
+                self.git_manager._repo.close()
+            self.git_manager._repo = None
+        super().closeEvent(event)

@@ -23,11 +23,24 @@ class CacheNode:
 class DistributedCache:
     """Распределенный кэш с поддержкой шардинга"""
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+        
     def __init__(self, host: str = 'localhost', port: int = 5000,
-                 capacity_mb: int = 100) -> None:
+                 capacity_mb: int = 100, test_mode: bool = False) -> None:
+        # Singleton pattern - only initialize once
+        if DistributedCache._initialized:
+            return
+            
         self.host = host
         self.port = port
         self.capacity = capacity_mb * 1024 * 1024  # Convert to bytes
+        self.test_mode = test_mode
         
         self._nodes: Dict[str, CacheNode] = {}
         self._local_cache: Dict[str, bytes] = {}
@@ -35,30 +48,71 @@ class DistributedCache:
         self._cache_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=4)
         self._logger = logging.getLogger(__name__)
+        self._server = None
+        self._running = False
         
         # Создаем локальное хранилище
         cache_dir = Path.home() / '.neuralforge' / 'cache'
         cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache_dir = cache_dir
         
-        # Запускаем сервер
-        self._start_server()
+        if not test_mode:
+            # Запускаем сервер
+            self._start_server()
+            
+        DistributedCache._initialized = True
         
     def _start_server(self) -> None:
         """Запуск сервера кэша"""
-        self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server.bind((self.host, self.port))
-        self._server.listen(5)
+        if self._running:
+            return
+            
+        max_retries = 5
+        current_port = self.port
         
-        def accept_connections():
-            while True:
-                try:
-                    client, addr = self._server.accept()
-                    self._executor.submit(self._handle_client, client)
-                except Exception as e:
-                    self._logger.error(f"Connection error: {e}")
-                    
-        threading.Thread(target=accept_connections, daemon=True).start()
+        for attempt in range(max_retries):
+            try:
+                self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._server.bind((self.host, current_port))
+                self._server.listen(5)
+                self.port = current_port  # Update port if we had to change it
+                self._running = True
+                
+                def accept_connections():
+                    while self._running:
+                        try:
+                            client, addr = self._server.accept()
+                            self._executor.submit(self._handle_client, client)
+                        except Exception as e:
+                            if self._running:  # Only log if we're still meant to be running
+                                self._logger.error(f"Connection error: {e}")
+                                
+                threading.Thread(target=accept_connections, daemon=True).start()
+                self._logger.info(f"Cache server started on port {self.port}")
+                break
+                
+            except OSError as e:
+                self._logger.warning(f"Port {current_port} is in use, trying next port")
+                if self._server:
+                    self._server.close()
+                current_port += 1
+                
+                if attempt == max_retries - 1:
+                    self._logger.error("Failed to start cache server after multiple attempts")
+                    if not self.test_mode:
+                        raise
+                        
+    def stop_server(self) -> None:
+        """Остановка сервера кэша"""
+        self._running = False
+        if self._server:
+            try:
+                self._server.close()
+            except Exception as e:
+                self._logger.error(f"Error closing server: {e}")
+                
+        self._executor.shutdown(wait=False)
+        self._logger.info("Cache server stopped")
         
     def _handle_client(self, client: socket.socket) -> None:
         """Обработка клиентских запросов"""
@@ -264,5 +318,17 @@ class DistributedCache:
             'utilization': (local_size + file_size) / self.capacity * 100
         }
 
+# Фабричная функция для создания распределенного кэша
+def get_distributed_cache(test_mode: bool = False) -> DistributedCache:
+    """Получить экземпляр распределенного кэша
+    
+    Args:
+        test_mode: Если True, кэш запускается в тестовом режиме без сетевого сервера
+        
+    Returns:
+        DistributedCache: Экземпляр распределенного кэша
+    """
+    return DistributedCache(test_mode=test_mode)
+
 # Глобальный экземпляр
-distributed_cache = DistributedCache()
+distributed_cache = get_distributed_cache()

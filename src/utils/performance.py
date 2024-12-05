@@ -8,6 +8,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from queue import Queue
+import inspect
 
 T = TypeVar('T')
 
@@ -18,7 +19,7 @@ class PerformanceMonitor(QObject):
     
     def __init__(self):
         super().__init__()
-        self.process = psutil.Process()
+        self._process = None  # Initialize as None
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_stats)
         self.update_timer.start(5000)  # Update every 5 seconds
@@ -27,46 +28,135 @@ class PerformanceMonitor(QObject):
         self.memory_threshold = 80  # Percentage
         self.cpu_threshold = 70     # Percentage
         
+    @property
+    def process(self):
+        """Get the process instance, creating it if needed"""
+        if self._process is None:
+            self._process = psutil.Process()
+            # Initialize CPU monitoring
+            self._process.cpu_percent()
+        return self._process
+    
+    @process.setter
+    def process(self, value):
+        """Set the process instance (useful for testing)"""
+        self._process = value
+
     def update_stats(self):
         """Update performance statistics"""
-        stats = {
-            'memory_percent': self.process.memory_percent(),
-            'cpu_percent': self.process.cpu_percent(),
-            'num_threads': self.process.num_threads(),
-            'io_counters': self.process.io_counters()._asdict(),
-            'system_memory': psutil.virtual_memory()._asdict()
-        }
-        
-        # Check thresholds and emit warnings
-        if stats['memory_percent'] > self.memory_threshold:
-            self.warning_triggered.emit(
-                f"High memory usage: {stats['memory_percent']:.1f}%"
-            )
-        if stats['cpu_percent'] > self.cpu_threshold:
-            self.warning_triggered.emit(
-                f"High CPU usage: {stats['cpu_percent']:.1f}%"
-            )
+        try:
+            # Get process stats
+            memory_percent = self.process.memory_percent()
+            cpu_percent = self.process.cpu_percent()
+            stats = {
+                'memory_percent': memory_percent,
+                'cpu_percent': cpu_percent,
+                'num_threads': self.process.num_threads(),
+                'io_counters': self.process.io_counters()._asdict(),
+                'system_memory': psutil.virtual_memory()._asdict()
+            }
             
-        self.stats_updated.emit(stats)
+            # Check thresholds and emit warnings first
+            if memory_percent > self.memory_threshold:
+                warning_msg = f"High memory usage: {memory_percent:.1f}%"
+                self.warning_triggered.emit(warning_msg)
+                
+            if cpu_percent > self.cpu_threshold:
+                warning_msg = f"High CPU usage: {cpu_percent:.1f}%"
+                self.warning_triggered.emit(warning_msg)
+                
+            # Then emit updated stats
+            self.stats_updated.emit(stats)
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Error updating performance stats: {str(e)}", exc_info=True)
 
 class AsyncWorker(QThread):
-    """Worker for running operations asynchronously"""
+    """Worker for running operations asynchronously.
+    
+    Signals:
+        started: Emitted when the worker starts running
+        finished(result): Emitted with the result when work is complete
+        error(exception): Emitted when an error occurs
+        progress(int): Emitted to report progress (0-100)
+    """
+    started = pyqtSignal()
     finished = pyqtSignal(object)
     error = pyqtSignal(Exception)
     progress = pyqtSignal(int)
     
     def __init__(self, func: Callable[..., T], *args, **kwargs):
+        """Initialize worker with function and arguments.
+        
+        Args:
+            func: Function to run asynchronously
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+        """
         super().__init__()
         self.func = func
         self.args = args
         self.kwargs = kwargs
+        self._is_running = False
+        self._should_stop = False
+        
+    def start(self):
+        """Start the worker thread."""
+        if not self.isRunning():
+            self._should_stop = False
+            super().start()
         
     def run(self):
+        """Execute the worker function in a separate thread."""
         try:
+            # Set state and emit started signal
+            self._is_running = True
+            self.started.emit()
+            
+            # Check if function accepts progress_callback
+            sig = inspect.signature(self.func)
+            if 'progress_callback' in sig.parameters:
+                self.kwargs['progress_callback'] = self.progress.emit
+                
+            # Run function and emit result
             result = self.func(*self.args, **self.kwargs)
-            self.finished.emit(result)
+            if not self._should_stop:
+                self.finished.emit(result)
         except Exception as e:
-            self.error.emit(e)
+            if not self._should_stop:
+                self.error.emit(e)
+        finally:
+            self._is_running = False
+            
+    def stop(self):
+        """Safely stop the worker and wait for it to finish."""
+        if self._is_running:
+            self._should_stop = True
+            self.wait()  # Wait for worker to finish
+            
+    def cleanup(self):
+        """Clean up worker resources and disconnect signals."""
+        if self.isRunning():
+            self.stop()  # Stop if still running
+            
+        # Disconnect all signals
+        try:
+            self.started.disconnect()
+            self.finished.disconnect()
+            self.error.disconnect()
+            self.progress.disconnect()
+        except:
+            pass
+            
+        self.deleteLater()
+            
+    def __del__(self):
+        """Cleanup when worker is deleted."""
+        try:
+            self.cleanup()
+        except:
+            pass
 
 class FileSystemCache:
     """Cache for file system operations with TTL and size limits."""

@@ -634,3 +634,216 @@ AttributeError: 'MainWindow' object has no attribute 'logger'. Did you mean: 'lo
 2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
 2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Style manager initialized
 2024-12-04 16:34:31,809 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:34:31,862 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x000001BCBD9E1770>
+2024-12-04 16:49:43,786 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:49:43,830 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:49:43,831 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-04 16:49:43,942 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:49:43,942 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:49:43,942 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:49:43,976 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x000002346A3119F0>
+2024-12-04 16:49:44,027 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-04 16:49:44,110 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x000002346A3119F0>
+2024-12-04 16:49:44,115 - src.utils.lazy_loading - DEBUG - Created component python_console with parent None
+2024-12-04 16:49:44,122 - src.ui.main_window - ERROR - Error during MainWindow initialization: 'MainWindow' object has no attribute 'console'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 63, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 180, in _init_ui
+    self.setup_menu_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 290, in setup_menu_bar
+    view_menu.addAction(self.console.parent().toggleViewAction())
+                        ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'console'
+2024-12-04 16:49:44,125 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'console'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 63, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 180, in _init_ui
+    self.setup_menu_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 290, in setup_menu_bar
+    view_menu.addAction(self.console.parent().toggleViewAction())
+                        ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'console'
+2024-12-04 16:49:44,130 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 43, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 63, in __init__
+    self._init_ui()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 180, in _init_ui
+    self.setup_menu_bar()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 290, in setup_menu_bar
+    view_menu.addAction(self.console.parent().toggleViewAction())
+                        ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'console'
+2024-12-04 16:49:44,154 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:49:44,337 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:49:44,549 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:53:18,285 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:53:18,324 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:53:18,325 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-04 16:53:18,408 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:53:18,409 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:53:18,409 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:53:18,445 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x00000253B1B419F0>
+2024-12-04 16:53:18,496 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-04 16:53:18,585 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x00000253B1B419F0>
+2024-12-04 16:53:18,589 - src.utils.lazy_loading - DEBUG - Created component python_console with parent <src.ui.main_window.MainWindow object at 0x00000253B1B419F0>
+2024-12-04 16:53:18,590 - src.ui.main_window - DEBUG - Dock widgets initialization completed
+2024-12-04 16:53:18,597 - src.ui.main_window - DEBUG - Menu bar setup completed
+2024-12-04 16:53:18,597 - src.ui.main_window - DEBUG - UI initialization completed successfully
+2024-12-04 16:53:18,598 - src.ui.main_window - DEBUG - UI initialized, window visible: False
+2024-12-04 16:53:18,625 - src.ui.main_window - DEBUG - Styles applied
+2024-12-04 16:53:18,625 - src.ui.main_window - ERROR - Error during MainWindow initialization: 'MainWindow' object has no attribute 'isValid'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 70, in __init__
+    self.logger.debug(f"Final window state - Visible: {self.isVisible()}, Valid: {self.isValid()}, Hidden: {self.isHidden()}")
+                                                                                  ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'isValid'
+2024-12-04 16:53:18,630 - main - ERROR - Fatal error occurred: 'MainWindow' object has no attribute 'isValid'
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 70, in __init__
+    self.logger.debug(f"Final window state - Visible: {self.isVisible()}, Valid: {self.isValid()}, Hidden: {self.isHidden()}")
+                                                                                  ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'isValid'
+2024-12-04 16:53:18,633 - root - ERROR - Error in debug mode
+Traceback (most recent call last):
+  File "C:\Users\xella\CascadeProjects\NeuralForge\debug.py", line 43, in <module>
+    main()
+  File "C:\Users\xella\CascadeProjects\NeuralForge\main.py", line 37, in main
+    window = MainWindow()
+             ^^^^^^^^^^^^
+  File "C:\Users\xella\CascadeProjects\NeuralForge\src\ui\main_window.py", line 70, in __init__
+    self.logger.debug(f"Final window state - Visible: {self.isVisible()}, Valid: {self.isValid()}, Hidden: {self.isHidden()}")
+                                                                                  ^^^^^^^^^^^^
+AttributeError: 'MainWindow' object has no attribute 'isValid'
+2024-12-04 16:53:18,656 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:53:18,841 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:53:19,042 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:55:19,079 - main - INFO - Logging system initialized in debug mode
+2024-12-04 16:55:19,121 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 16:55:19,121 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-04 16:55:19,209 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 16:55:19,210 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 16:55:19,210 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 16:55:19,245 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x0000019862FC1A90>
+2024-12-04 16:55:19,295 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-04 16:55:19,379 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x0000019862FC1A90>
+2024-12-04 16:55:19,384 - src.utils.lazy_loading - DEBUG - Created component python_console with parent <src.ui.main_window.MainWindow object at 0x0000019862FC1A90>
+2024-12-04 16:55:19,385 - src.ui.main_window - DEBUG - Dock widgets initialization completed
+2024-12-04 16:55:19,391 - src.ui.main_window - DEBUG - Menu bar setup completed
+2024-12-04 16:55:19,391 - src.ui.main_window - DEBUG - UI initialization completed successfully
+2024-12-04 16:55:19,391 - src.ui.main_window - DEBUG - UI initialized, window visible: False
+2024-12-04 16:55:19,417 - src.ui.main_window - DEBUG - Styles applied
+2024-12-04 16:55:19,418 - src.ui.main_window - DEBUG - Final window state - Visible: False, Hidden: True, Geometry: PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 16:55:19,431 - src.ui.main_window - DEBUG - Show event - Window becoming visible
+2024-12-04 16:55:19,432 - src.ui.main_window - DEBUG - Window state after show: Visible=True, Hidden=False, Geometry=PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 16:55:19,440 - main - INFO - Application started successfully
+2024-12-04 16:55:19,462 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:55:19,660 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 16:55:19,880 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 17:02:05,725 - src.ui.main_window - DEBUG - Hide event - Window becoming hidden
+2024-12-04 17:02:05,725 - src.ui.main_window - DEBUG - Window state after hide: Visible=False, Hidden=True, Geometry=PyQt6.QtCore.QRect(806, 135, 1200, 800)
+2024-12-04 23:51:10,063 - main - INFO - Logging system initialized in debug mode
+2024-12-04 23:51:10,084 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 23:51:10,085 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-04 23:51:10,148 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 23:51:10,148 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 23:51:10,148 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 23:51:10,148 - src.ui.main_window - DEBUG - Icon path set to: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons
+2024-12-04 23:51:10,149 - src.ui.main_window - WARNING - Icon file not found: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\dock.svg
+2024-12-04 23:51:10,177 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x000002345BBB23F0>
+2024-12-04 23:51:10,199 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-04 23:51:10,245 - src.ui.main_window - ERROR - Failed to initialize Git panel: name 'os' is not defined
+2024-12-04 23:51:10,246 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x000002345BBB23F0>
+2024-12-04 23:51:10,251 - src.utils.lazy_loading - DEBUG - Created component python_console with parent <src.ui.main_window.MainWindow object at 0x000002345BBB23F0>
+2024-12-04 23:51:10,252 - src.ui.main_window - DEBUG - Dock widgets initialization completed
+2024-12-04 23:51:10,253 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\code.svg
+2024-12-04 23:51:10,254 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\folder.svg
+2024-12-04 23:51:10,254 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\save.svg
+2024-12-04 23:51:10,255 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\play.svg
+2024-12-04 23:51:10,255 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\debug.svg
+2024-12-04 23:51:10,256 - src.ui.main_window - DEBUG - Menu bar setup completed
+2024-12-04 23:51:10,256 - src.ui.main_window - DEBUG - UI initialization completed successfully
+2024-12-04 23:51:10,256 - src.ui.main_window - DEBUG - UI initialized, window visible: False
+2024-12-04 23:51:10,279 - src.ui.main_window - DEBUG - Styles applied
+2024-12-04 23:51:10,279 - src.ui.main_window - DEBUG - Final window state - Visible: False, Hidden: True, Geometry: PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 23:51:10,292 - src.ui.main_window - DEBUG - Show event - Window becoming visible
+2024-12-04 23:51:10,292 - src.ui.main_window - DEBUG - Window state after show: Visible=True, Hidden=False, Geometry=PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 23:51:10,301 - main - INFO - Application started successfully
+2024-12-04 23:51:10,317 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:51:10,449 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:51:10,565 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:59:25,957 - main - INFO - Logging system initialized in debug mode
+2024-12-04 23:59:25,977 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-04 23:59:25,979 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-04 23:59:26,047 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-04 23:59:26,047 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-04 23:59:26,047 - src.ui.main_window - DEBUG - Components registered
+2024-12-04 23:59:26,048 - src.ui.main_window - DEBUG - Icon path set to: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons
+2024-12-04 23:59:26,052 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\dock.svg
+2024-12-04 23:59:26,076 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x00000266F0F92350>
+2024-12-04 23:59:26,096 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-04 23:59:26,143 - src.ui.main_window - ERROR - Failed to initialize Git panel: name 'os' is not defined
+2024-12-04 23:59:26,144 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x00000266F0F92350>
+2024-12-04 23:59:26,149 - src.utils.lazy_loading - DEBUG - Created component python_console with parent <src.ui.main_window.MainWindow object at 0x00000266F0F92350>
+2024-12-04 23:59:26,150 - src.ui.main_window - DEBUG - Dock widgets initialization completed
+2024-12-04 23:59:26,151 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\code.svg
+2024-12-04 23:59:26,152 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\folder.svg
+2024-12-04 23:59:26,153 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\save.svg
+2024-12-04 23:59:26,153 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\play.svg
+2024-12-04 23:59:26,154 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\debug.svg
+2024-12-04 23:59:26,155 - src.ui.main_window - DEBUG - Menu bar setup completed
+2024-12-04 23:59:26,156 - src.ui.main_window - DEBUG - UI initialization completed successfully
+2024-12-04 23:59:26,156 - src.ui.main_window - DEBUG - UI initialized, window visible: False
+2024-12-04 23:59:26,177 - src.ui.main_window - DEBUG - Styles applied
+2024-12-04 23:59:26,177 - src.ui.main_window - DEBUG - Final window state - Visible: False, Hidden: True, Geometry: PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 23:59:26,189 - src.ui.main_window - DEBUG - Show event - Window becoming visible
+2024-12-04 23:59:26,190 - src.ui.main_window - DEBUG - Window state after show: Visible=True, Hidden=False, Geometry=PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-04 23:59:26,197 - main - INFO - Application started successfully
+2024-12-04 23:59:26,215 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:59:26,342 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:59:26,460 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-04 23:59:37,785 - src.ui.main_window - DEBUG - Hide event - Window becoming hidden
+2024-12-04 23:59:37,786 - src.ui.main_window - DEBUG - Window state after hide: Visible=False, Hidden=True, Geometry=PyQt6.QtCore.QRect(776, 206, 1200, 800)
+2024-12-05 00:03:51,147 - main - INFO - Logging system initialized in debug mode
+2024-12-05 00:03:51,350 - src.ui.main_window - DEBUG - MainWindow initialization started
+2024-12-05 00:03:51,351 - src.ui.main_window - DEBUG - Window size set to: PyQt6.QtCore.QSize(1200, 800)
+2024-12-05 00:03:51,617 - src.ui.main_window - DEBUG - Project root set to: C:\Users\xella\CascadeProjects\NeuralForge
+2024-12-05 00:03:51,617 - src.ui.main_window - DEBUG - Style manager initialized
+2024-12-05 00:03:51,617 - src.ui.main_window - DEBUG - Components registered
+2024-12-05 00:03:51,617 - src.ui.main_window - DEBUG - Icon path set to: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons
+2024-12-05 00:03:51,649 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\dock.svg
+2024-12-05 00:03:51,722 - src.utils.lazy_loading - DEBUG - Created component project_explorer with parent <src.ui.main_window.MainWindow object at 0x0000019B5F302350>
+2024-12-05 00:03:52,043 - git.cmd - DEBUG - Popen(['git', 'cat-file', '--batch-check'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=<valid stream>, shell=False, universal_newlines=False)
+2024-12-05 00:03:52,097 - src.utils.lazy_loading - DEBUG - Created component performance_monitor with parent <src.ui.main_window.MainWindow object at 0x0000019B5F302350>
+2024-12-05 00:03:52,103 - src.utils.lazy_loading - DEBUG - Created component python_console with parent <src.ui.main_window.MainWindow object at 0x0000019B5F302350>
+2024-12-05 00:03:52,104 - src.ui.main_window - DEBUG - Dock widgets initialization completed
+2024-12-05 00:03:52,108 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\code.svg
+2024-12-05 00:03:52,113 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\folder.svg
+2024-12-05 00:03:52,116 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\save.svg
+2024-12-05 00:03:52,119 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\play.svg
+2024-12-05 00:03:52,124 - src.ui.main_window - WARNING - Icon has no available sizes: C:\Users\xella\CascadeProjects\NeuralForge\src\ui\resources\icons\debug.svg
+2024-12-05 00:03:52,125 - src.ui.main_window - DEBUG - Menu bar setup completed
+2024-12-05 00:03:52,125 - src.ui.main_window - DEBUG - UI initialization completed successfully
+2024-12-05 00:03:52,125 - src.ui.main_window - DEBUG - UI initialized, window visible: False
+2024-12-05 00:03:52,142 - src.ui.main_window - DEBUG - Styles applied
+2024-12-05 00:03:52,142 - src.ui.main_window - DEBUG - Final window state - Visible: False, Hidden: True, Geometry: PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-05 00:03:52,155 - src.ui.main_window - DEBUG - Show event - Window becoming visible
+2024-12-05 00:03:52,155 - src.ui.main_window - DEBUG - Window state after show: Visible=True, Hidden=False, Geometry=PyQt6.QtCore.QRect(776, 152, 1200, 800)
+2024-12-05 00:03:52,163 - main - INFO - Application started successfully
+2024-12-05 00:03:52,205 - git.cmd - DEBUG - Popen(['git', 'diff', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-05 00:03:52,343 - git.cmd - DEBUG - Popen(['git', 'status', '--porcelain', '--untracked-files'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-05 00:03:52,457 - git.cmd - DEBUG - Popen(['git', 'diff', '-R', '597892a20f8e50d0beddec72fb8a379b90e18349', '--cached', '--abbrev=40', '--full-index', '-M', '--raw', '-z', '--no-color'], cwd=C:\Users\xella\CascadeProjects\NeuralForge, stdin=None, shell=False, universal_newlines=False)
+2024-12-05 00:05:12,402 - src.ui.main_window - DEBUG - Hide event - Window becoming hidden
+2024-12-05 00:05:12,402 - src.ui.main_window - DEBUG - Window state after hide: Visible=False, Hidden=True, Geometry=PyQt6.QtCore.QRect(816, 192, 1200, 800)

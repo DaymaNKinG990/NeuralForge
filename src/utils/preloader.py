@@ -136,6 +136,17 @@ class PreloadManager:
         self._worker_thread.join()
         self._executor.shutdown()
 
+    def __del__(self):
+        """Cleanup when PreloadManager is destroyed."""
+        try:
+            self._stop_event.set()
+            if hasattr(self, '_worker_thread') and self._worker_thread.is_alive():
+                self._worker_thread.join(timeout=1.0)
+            if hasattr(self, '_executor'):
+                self._executor.shutdown(wait=False)
+        except Exception:
+            pass  # Ignore cleanup errors
+
 class ComponentPreloader:
     """Предварительная загрузка компонентов UI"""
     
