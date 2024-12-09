@@ -37,6 +37,7 @@ class ModelOptimizer(QWidget):
         self.lr_spin = QDoubleSpinBox()
         self.lr_spin.setRange(0.00001, 1.0)
         self.lr_spin.setSingleStep(0.0001)
+        self.lr_spin.setDecimals(6)  # Allow more decimal places
         self.lr_spin.setValue(0.001)
         lr_layout.addWidget(QLabel("Learning Rate:"))
         lr_layout.addWidget(self.lr_spin)
@@ -46,6 +47,7 @@ class ModelOptimizer(QWidget):
         self.wd_spin = QDoubleSpinBox()
         self.wd_spin.setRange(0, 0.1)
         self.wd_spin.setSingleStep(0.001)
+        self.wd_spin.setDecimals(6)  # Allow more decimal places
         self.wd_spin.setValue(0)
         wd_layout.addWidget(QLabel("Weight Decay:"))
         wd_layout.addWidget(self.wd_spin)
@@ -55,6 +57,7 @@ class ModelOptimizer(QWidget):
         self.momentum_spin = QDoubleSpinBox()
         self.momentum_spin.setRange(0, 1.0)
         self.momentum_spin.setSingleStep(0.1)
+        self.momentum_spin.setDecimals(6)  # Allow more decimal places
         self.momentum_spin.setValue(0.9)
         self.momentum_spin.setEnabled(False)
         momentum_layout.addWidget(QLabel("Momentum:"))
@@ -84,7 +87,7 @@ class ModelOptimizer(QWidget):
             self.model = model
             self.create_btn.setEnabled(True)
         except Exception as e:
-            self.logger.error(f"Error setting model: {str(e)}")
+            self.logger.error(f"Error setting model: {str(e)}", exc_info=True)
             
     def _update_ui(self):
         """Update UI based on selected optimizer."""
@@ -92,7 +95,7 @@ class ModelOptimizer(QWidget):
             optimizer = self.optimizer_combo.currentText()
             self.momentum_spin.setEnabled(optimizer == "SGD")
         except Exception as e:
-            self.logger.error(f"Error updating UI: {str(e)}")
+            self.logger.error(f"Error updating UI: {str(e)}", exc_info=True)
             
     def _create_optimizer(self):
         """Create optimizer with selected configuration."""
@@ -100,20 +103,35 @@ class ModelOptimizer(QWidget):
             if self.model is None:
                 return
                 
-            optimizer_class = getattr(optim, self.optimizer_combo.currentText())
+            optimizer_type = self.optimizer_combo.currentText()
+            
+            # Get parameters, ensuring they are float values
+            lr = float(self.lr_spin.value())
+            weight_decay = float(self.wd_spin.value())
+            
             params = {
-                "lr": self.lr_spin.value(),
-                "weight_decay": self.wd_spin.value()
+                "lr": lr,
+                "weight_decay": weight_decay
             }
             
-            if self.optimizer_combo.currentText() == "SGD":
-                params["momentum"] = self.momentum_spin.value()
+            if optimizer_type == "SGD":
+                params["momentum"] = float(self.momentum_spin.value())
                 
-            optimizer = optimizer_class(self.model.parameters(), **params)
-            self.optimizer_created.emit(optimizer)
+            optimizer = None
+            if optimizer_type == "Adam":
+                optimizer = optim.Adam(self.model.parameters(), **params)
+            elif optimizer_type == "SGD":
+                optimizer = optim.SGD(self.model.parameters(), **params)
+            elif optimizer_type == "RMSprop":
+                optimizer = optim.RMSprop(self.model.parameters(), **params)
+            elif optimizer_type == "AdamW":
+                optimizer = optim.AdamW(self.model.parameters(), **params)
+                
+            if optimizer:
+                self.optimizer_created.emit(optimizer)
             
         except Exception as e:
-            self.logger.error(f"Error creating optimizer: {str(e)}")
+            self.logger.error(f"Error creating optimizer: {str(e)}", exc_info=True)
             
     def reset(self):
         """Reset optimizer state."""

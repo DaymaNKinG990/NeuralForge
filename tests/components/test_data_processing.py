@@ -22,71 +22,72 @@ def sample_data():
     labels = torch.randint(0, 2, (100,))
     return data, labels
 
-class TestDataPreprocessor:
-    """Test DataPreprocessor component."""
+# DataPreprocessor Tests
+def test_preprocessor_initialization(app):
+    """Test preprocessor component initialization."""
+    preprocessor = DataPreprocessor()
+    assert preprocessor is not None
+    assert preprocessor.data is None
+    assert preprocessor.labels is None
+
+def test_preprocessor_set_data(app, sample_data):
+    """Test setting data in preprocessor."""
+    preprocessor = DataPreprocessor()
+    data, labels = sample_data
+    preprocessor.set_data(data, labels)
+    assert preprocessor.data is not None
+    assert preprocessor.labels is not None
+
+def test_standard_scaling(app, sample_data):
+    """Test standard scaling preprocessing."""
+    preprocessor = DataPreprocessor()
+    data, labels = sample_data
+    preprocessor.set_data(data, labels)
     
-    def test_initialization(self, app):
-        """Test component initialization."""
-        preprocessor = DataPreprocessor()
-        assert preprocessor is not None
-        assert preprocessor.data is None
-        assert preprocessor.labels is None
-        
-    def test_set_data(self, app, sample_data):
-        """Test setting data."""
-        preprocessor = DataPreprocessor()
-        data, labels = sample_data
-        preprocessor.set_data(data, labels)
-        assert preprocessor.data is not None
-        assert preprocessor.labels is not None
-        
-    def test_standard_scaling(self, app, sample_data):
-        """Test standard scaling preprocessing."""
-        preprocessor = DataPreprocessor()
-        data, labels = sample_data
-        preprocessor.set_data(data, labels)
-        
-        # Set standard scaling
-        preprocessor.scaling_combo.setCurrentText("Standard Scaling")
-        preprocessor._process_data()
-        
-        # Check if data is scaled
-        processed_data = preprocessor.scaler.transform(data)
-        assert np.allclose(processed_data.mean(axis=0), 0, atol=1e-7)
-        assert np.allclose(processed_data.std(axis=0), 1, atol=1e-7)
-        
-class TestDataAugmentor:
-    """Test DataAugmentor component."""
+    # Set standard scaling
+    preprocessor.scaling_combo.setCurrentText("Standard Scaling")
+    preprocessor._process_data()
     
-    def test_initialization(self, app):
-        """Test component initialization."""
-        augmentor = DataAugmentor()
-        assert augmentor is not None
-        assert augmentor.data is None
-        assert augmentor.labels is None
-        
-    def test_set_data(self, app, sample_data):
-        """Test setting data."""
-        augmentor = DataAugmentor()
-        data, labels = sample_data
-        augmentor.set_data(data, labels)
-        assert augmentor.data is not None
-        assert augmentor.labels is not None
-        
-    def test_noise_augmentation(self, app, sample_data):
-        """Test noise augmentation."""
-        augmentor = DataAugmentor()
-        data, labels = sample_data
-        augmentor.set_data(data, labels)
-        
-        # Enable noise augmentation
-        augmentor.noise_check.setChecked(True)
-        augmentor.noise_strength.setValue(0.1)
-        
-        # Perform augmentation
-        original_data = data.clone()
-        augmented_data = augmentor._add_noise(data)
-        
-        # Check if noise was added
-        assert torch.any(torch.ne(augmented_data, original_data))
-        assert torch.allclose(augmented_data, original_data, atol=0.2)  # Noise within bounds
+    # Check scaled data
+    assert preprocessor.processed_data is not None
+    X_train, X_test = preprocessor.processed_data
+    
+    # Check that both train and test data are properly scaled
+    # Mean should be close to 0 and std close to 1 for each feature
+    # Using unbiased=True to match scikit-learn's behavior
+    assert torch.allclose(X_train.mean(dim=0), torch.zeros(X_train.size(1)), atol=1e-6)
+    assert torch.allclose(X_train.std(dim=0, unbiased=True), torch.ones(X_train.size(1)), atol=1e-6)
+    assert torch.allclose(X_test.mean(dim=0), torch.zeros(X_test.size(1)), atol=1e-6)
+    assert torch.allclose(X_test.std(dim=0, unbiased=True), torch.ones(X_test.size(1)), atol=1e-6)
+
+# DataAugmentor Tests
+def test_augmentor_initialization(app):
+    """Test augmentor component initialization."""
+    augmentor = DataAugmentor()
+    assert augmentor is not None
+    assert augmentor.data is None
+    assert augmentor.labels is None
+
+def test_augmentor_set_data(app, sample_data):
+    """Test setting data in augmentor."""
+    augmentor = DataAugmentor()
+    data, labels = sample_data
+    augmentor.set_data(data, labels)
+    assert augmentor.data is not None
+    assert augmentor.labels is not None
+
+def test_noise_augmentation(app, sample_data):
+    """Test noise augmentation."""
+    augmentor = DataAugmentor()
+    data, labels = sample_data
+    augmentor.set_data(data, labels)
+    
+    # Set noise augmentation
+    augmentor.augmentation_combo.setCurrentText("Add Noise")
+    augmentor.noise_std.setValue(0.1)
+    augmentor._augment_data()
+    
+    # Check augmented data
+    assert augmentor.augmented_data is not None
+    assert augmentor.augmented_data.shape == data.shape
+    assert not torch.allclose(augmentor.augmented_data, data)

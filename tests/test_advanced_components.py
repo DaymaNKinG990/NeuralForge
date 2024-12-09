@@ -28,167 +28,169 @@ from src.utils.error_handling import (
     ModelError
 )
 
-class TestAdvancedPreprocessing:
-    """Test advanced preprocessing components."""
-    
-    @pytest.fixture
-    def preprocessor(self):
-        return AdvancedPreprocessor()
-        
-    @pytest.fixture
-    def sample_data(self):
-        return np.random.randn(100, 10)
-        
-    def test_handle_missing_values(self, preprocessor, sample_data):
-        """Test missing value imputation."""
-        # Create data with missing values
-        data = sample_data.copy()
-        data[0:10, 0] = np.nan
-        
-        # Test different imputation strategies
-        imputed_mean = preprocessor.handle_missing_values(data, 'mean')
-        imputed_median = preprocessor.handle_missing_values(data, 'median')
-        
-        assert not np.isnan(imputed_mean).any()
-        assert not np.isnan(imputed_median).any()
-        
-    def test_scale_features(self, preprocessor, sample_data):
-        """Test feature scaling."""
-        # Test different scaling methods
-        scaled_standard = preprocessor.scale_features(sample_data, 'standard')
-        scaled_minmax = preprocessor.scale_features(sample_data, 'minmax')
-        
-        assert np.abs(scaled_standard.mean()) < 1e-10
-        assert scaled_minmax.min() >= 0 and scaled_minmax.max() <= 1
-        
-    def test_select_features(self, preprocessor, sample_data):
-        """Test feature selection."""
-        labels = np.random.randint(0, 2, size=100)
-        selected = preprocessor.select_features(sample_data, labels,
-                                             method='kbest',
-                                             k=5)
-        assert selected.shape[1] == 5
+# Fixtures
+@pytest.fixture
+def advanced_preprocessor():
+    return AdvancedPreprocessor()
 
-class TestTimeSeriesProcessing:
-    """Test time series processing components."""
-    
-    @pytest.fixture
-    def processor(self):
-        return TimeSeriesPreprocessor()
-        
-    @pytest.fixture
-    def sample_timeseries(self):
-        return np.sin(np.linspace(0, 10, 100))
-        
-    def test_create_sequences(self, processor, sample_timeseries):
-        """Test sequence creation."""
-        seq_len = 10
-        target_size = 1
-        X, y = processor.create_sequences(sample_timeseries,
-                                        seq_len,
-                                        target_size)
-        
-        assert len(X) == len(y)
-        assert X.shape[1] == seq_len
-        assert y.shape[1] == target_size
-        
-    def test_handle_seasonality(self, processor, sample_timeseries):
-        """Test seasonality handling."""
-        period = 10
-        diff = processor.handle_seasonality(sample_timeseries,
-                                          period,
-                                          method='difference')
-        ratio = processor.handle_seasonality(sample_timeseries,
-                                           period,
-                                           method='ratio')
-                                           
-        assert len(diff) == len(sample_timeseries) - period
-        assert len(ratio) == len(sample_timeseries) - period
+@pytest.fixture
+def sample_data():
+    return np.random.randn(100, 10)
 
-class TestAdvancedArchitectures:
-    """Test advanced model architectures."""
-    
-    def test_transformer_block(self):
-        """Test transformer block."""
-        block = TransformerBlock(embed_dim=64,
-                               num_heads=4,
-                               ff_dim=128)
-        x = torch.randn(10, 32, 64)  # (seq_len, batch_size, embed_dim)
-        out = block(x)
-        assert out.shape == x.shape
-        
-    def test_residual_block(self):
-        """Test residual block."""
-        block = ResidualBlock(in_channels=64,
-                            out_channels=128,
-                            stride=2)
-        x = torch.randn(1, 64, 32, 32)
-        out = block(x)
-        assert out.shape == (1, 128, 16, 16)
-        
-    def test_lstm_attention(self):
-        """Test LSTM with attention."""
-        model = LSTMWithAttention(input_size=10,
-                                hidden_size=20,
-                                num_layers=2)
-        x = torch.randn(32, 15, 10)  # (batch_size, seq_len, input_size)
-        out, (h_n, c_n) = model(x)
-        assert out.shape == (32, 20)
-        assert h_n.shape == (2, 32, 20)
-        
-    def test_unet(self):
-        """Test U-Net architecture."""
-        model = UNet(in_channels=3, out_channels=1)
-        x = torch.randn(1, 3, 256, 256)
-        out = model(x)
-        assert out.shape == (1, 1, 256, 256)
-        
-    def test_gan(self):
-        """Test GAN architecture."""
-        model = GAN(latent_dim=100, channels=3)
-        z = torch.randn(32, 100, 1, 1)
-        x_fake = model.generate(z)
-        d_out = model.discriminate(x_fake)
-        assert x_fake.shape == (32, 3, 32, 32)
-        assert d_out.shape == (32, 1, 1, 1)
+@pytest.fixture
+def timeseries_processor():
+    return TimeSeriesPreprocessor()
 
-class TestErrorHandling:
-    """Test error handling system."""
+@pytest.fixture
+def sample_timeseries():
+    return np.random.randn(1000, 1)
+
+@pytest.fixture
+def error_handler():
+    return ErrorHandler()
+
+@pytest.fixture
+def error_monitor(error_handler):
+    monitor = ErrorMonitor(error_handler)
+    return monitor
+
+# Advanced Preprocessing Tests
+def test_handle_missing_values(advanced_preprocessor, sample_data):
+    """Test missing value imputation."""
+    # Create data with missing values
+    data = sample_data.copy()
+    data[0:10, 0] = np.nan
     
-    @pytest.fixture
-    def error_handler(self):
-        return ErrorHandler()
-        
-    @pytest.fixture
-    def error_monitor(self, error_handler):
-        return ErrorMonitor(error_handler)
-        
-    def test_error_handling(self, error_handler):
-        """Test basic error handling."""
+    # Test different imputation strategies
+    imputed_mean = advanced_preprocessor.handle_missing_values(data, 'mean')
+    imputed_median = advanced_preprocessor.handle_missing_values(data, 'median')
+    
+    assert not np.any(np.isnan(imputed_mean))
+    assert not np.any(np.isnan(imputed_median))
+    assert np.allclose(imputed_mean[0:10, 0], np.mean(data[10:, 0]))
+    assert np.allclose(imputed_median[0:10, 0], np.median(data[10:, 0]))
+
+def test_feature_scaling(advanced_preprocessor, sample_data):
+    """Test feature scaling methods."""
+    # Test different scaling methods
+    scaled_standard = advanced_preprocessor.scale_features(sample_data, 'standard')
+    scaled_minmax = advanced_preprocessor.scale_features(sample_data, 'minmax')
+    
+    assert np.allclose(scaled_standard.mean(axis=0), 0, atol=1e-7)
+    assert np.allclose(scaled_standard.std(axis=0), 1, atol=1e-7)
+    assert np.all(scaled_minmax >= 0) and np.all(scaled_minmax <= 1)
+
+# Time Series Processing Tests
+def test_create_sequences(timeseries_processor, sample_timeseries):
+    """Test sequence creation."""
+    seq_length = 10
+    sequences = timeseries_processor.create_sequences(sample_timeseries, seq_length)
+    
+    assert sequences.shape[1] == seq_length
+    assert sequences.shape[0] == len(sample_timeseries) - seq_length + 1
+
+def test_handle_seasonality(timeseries_processor, sample_timeseries):
+    """Test seasonality handling."""
+    period = 24  # e.g., hourly data with daily seasonality
+    deseasonalized = timeseries_processor.handle_seasonality(sample_timeseries, period)
+    seasonal_component = timeseries_processor.extract_seasonality(sample_timeseries, period)
+    
+    assert deseasonalized.shape == sample_timeseries.shape
+    assert seasonal_component.shape == sample_timeseries.shape
+
+# Advanced Architectures Tests
+def test_transformer_block():
+    """Test transformer block."""
+    batch_size = 32
+    seq_length = 10
+    d_model = 64
+    
+    block = TransformerBlock(d_model=d_model, nhead=8)
+    x = torch.randn(batch_size, seq_length, d_model)
+    output = block(x)
+    
+    assert output.shape == (batch_size, seq_length, d_model)
+
+def test_residual_block():
+    """Test residual block."""
+    batch_size = 32
+    channels = 64
+    
+    block = ResidualBlock(in_channels=channels, out_channels=channels)
+    x = torch.randn(batch_size, channels, 28, 28)
+    output = block(x)
+    
+    assert output.shape == x.shape
+
+def test_lstm_attention():
+    """Test LSTM with attention."""
+    batch_size = 32
+    seq_length = 10
+    input_size = 20
+    hidden_size = 64
+    
+    model = LSTMWithAttention(input_size=input_size, hidden_size=hidden_size)
+    x = torch.randn(batch_size, seq_length, input_size)
+    output, attention = model(x)
+    
+    assert output.shape == (batch_size, hidden_size)
+    assert attention.shape == (batch_size, seq_length)
+
+def test_unet():
+    """Test U-Net architecture."""
+    batch_size = 8
+    channels = 3
+    height = width = 256
+    
+    model = UNet(in_channels=channels, out_channels=1)
+    x = torch.randn(batch_size, channels, height, width)
+    output = model(x)
+    
+    assert output.shape == (batch_size, 1, height, width)
+
+def test_gan():
+    """Test GAN architecture."""
+    batch_size = 32
+    latent_dim = 100
+    img_channels = 3
+    img_size = 64
+    
+    gan = GAN(latent_dim=latent_dim, img_channels=img_channels)
+    noise = torch.randn(batch_size, latent_dim)
+    fake_images = gan.generator(noise)
+    disc_output = gan.discriminator(fake_images)
+    
+    assert fake_images.shape == (batch_size, img_channels, img_size, img_size)
+    assert disc_output.shape == (batch_size, 1)
+
+# Error Handling Tests
+def test_error_handling(error_handler):
+    """Test basic error handling."""
+    # Test data error handling
+    with pytest.raises(DataError):
+        error_handler.handle_error(DataError("Missing values detected"))
+    
+    # Test model error handling
+    with pytest.raises(ModelError):
+        error_handler.handle_error(ModelError("Invalid model configuration"))
+
+def test_error_monitoring(error_handler, error_monitor):
+    """Test error monitoring and analysis."""
+    # Generate some errors
+    errors = [
+        DataError("Missing values"),
+        ModelError("Convergence failure"),
+        DataError("Invalid format")
+    ]
+    
+    for error in errors:
         try:
-            raise DataError("Test error", "TEST_001")
-        except Exception as e:
-            error_handler.handle_error(e)
-            
-        assert len(error_handler.error_history) == 1
-        assert error_handler.error_history[0]['type'] == 'DataError'
-        
-    def test_error_monitoring(self, error_handler, error_monitor):
-        """Test error monitoring and analysis."""
-        # Generate some errors
-        for _ in range(3):
-            try:
-                raise DataError("Data error", "DATA_001")
-            except Exception as e:
-                error_handler.handle_error(e)
-                
-        for _ in range(2):
-            try:
-                raise ModelError("Model error", "MODEL_001")
-            except Exception as e:
-                error_handler.handle_error(e)
-                
-        analysis = error_monitor.analyze_errors()
-        assert analysis['total_errors'] == 5
-        assert analysis['error_counts']['DataError'] == 3
-        assert analysis['error_counts']['ModelError'] == 2
+            error_handler.handle_error(error)
+        except (DataError, ModelError):
+            pass
+    
+    # Check error statistics
+    stats = error_monitor.get_error_stats()
+    assert stats["total_errors"] == len(errors)
+    assert stats["data_errors"] == 2
+    assert stats["model_errors"] == 1

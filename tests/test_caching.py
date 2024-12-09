@@ -1,170 +1,177 @@
+"""Tests for caching utilities."""
 import pytest
 import time
-import os
-import shutil
-import pickle
-from src.utils.caching import CacheManager, SearchCache, CacheEntry
+import threading
+from src.utils.caching import CacheManager, Cache, CacheEntry, CacheEvent, CacheEventType, cache_result, LoadPriority
 
 @pytest.fixture
 def cache_manager():
-    """Create a test cache manager with smaller limits"""
-    # Очищаем кэш перед каждым тестом
-    if os.path.exists("cache"):
-        shutil.rmtree("cache")
-    
-    manager = CacheManager(max_size_mb=1, max_entries=10)
+    """Create cache manager fixture."""
+    manager = CacheManager()
     yield manager
-    
-    # Cleanup
-    manager.clear()
-    if os.path.exists("cache"):
-        shutil.rmtree("cache")
 
 @pytest.fixture
-def search_cache():
-    """Create a test search cache"""
-    cache = SearchCache()
+def cache():
+    """Create cache fixture."""
+    cache = Cache(max_size=10, default_ttl=1)
     yield cache
-    # Cleanup
-    cache.clear()
-    if os.path.exists("cache"):
-        shutil.rmtree("cache")
 
-def test_basic_cache_operations(cache_manager):
-    """Test basic set/get operations"""
-    # Test setting and getting
-    assert cache_manager.set("test_key", "test_value")
-    assert cache_manager.get("test_key") == "test_value"
+def test_cache_manager_creation(cache_manager):
+    """Test cache manager creation."""
+    assert cache_manager is not None
+    assert isinstance(cache_manager._caches, dict)
+    assert isinstance(cache_manager._monitors, list)
+
+def test_cache_manager_registration(cache_manager, cache):
+    """Test cache registration."""
+    cache_manager.register_cache("test", cache)
+    assert cache_manager.get_cache("test") == cache
+    assert cache_manager.get_cache("non_existent") is None
+
+def test_cache_manager_monitoring(cache_manager):
+    """Test cache event monitoring."""
+    events = []
+    def monitor(event):
+        events.append(event)
+    
+    cache_manager.add_monitor(monitor)
+    
+    # Create event
+    event = CacheEvent(CacheEventType.HIT, "test_key")
+    cache_manager.notify_event(event)
+    
+    assert len(events) == 1
+    assert events[0] == event
+
+def test_cache_basic_operations(cache):
+    """Test basic cache operations."""
+    # Test set and get
+    cache.set("test", "value")
+    assert cache.get("test") == "value"
     
     # Test non-existent key
-    assert cache_manager.get("non_existent") is None
+    assert cache.get("missing") is None
     
-    # Test overwriting
-    assert cache_manager.set("test_key", "new_value")
-    assert cache_manager.get("test_key") == "new_value"
+    # Test expiry
+    cache.set("expire", "value", ttl=0.1)
+    assert cache.get("expire") == "value"
+    time.sleep(0.2)
+    assert cache.get("expire") is None
 
-def test_cache_expiry(cache_manager):
-    """Test TTL functionality"""
-    # Set with 1 second TTL
-    assert cache_manager.set("expire_key", "expire_value", ttl=1)
-    assert cache_manager.get("expire_key") == "expire_value"
+def test_cache_memory_management(cache):
+    """Test cache memory management."""
+    # Fill cache
+    for i in range(20):
+        cache.set(f"key_{i}", "x" * 1000, size_estimate=1000)
+    
+    # Check size is limited
+    assert len(cache._entries) <= cache._max_size
+    
+    # Check memory tracking
+    assert cache._current_memory > 0
+    assert cache._current_memory <= cache._memory_limit
+
+def test_cache_priority(cache):
+    """Test cache priority handling."""
+    # Add entries with different priorities
+    cache.set("critical", "value", priority=LoadPriority.CRITICAL)
+    cache.set("low", "value", priority=LoadPriority.LOW)
+    
+    # Fill cache to trigger eviction
+    for i in range(20):
+        cache.set(f"key_{i}", "value")
+    
+    # Critical should remain, low might be evicted
+    assert cache.get("critical") == "value"
+    if cache.get("low") is not None:
+        pytest.fail("Low priority entry should have been evicted")
+
+def test_cache_cleanup(cache):
+    """Test cache cleanup."""
+    # Add expired entries
+    cache.set("expire1", "value", ttl=0.1)
+    cache.set("expire2", "value", ttl=0.1)
+    cache.set("keep", "value", ttl=10)
+    
+    time.sleep(0.2)
+    cache._cleanup()
+    
+    assert cache.get("expire1") is None
+    assert cache.get("expire2") is None
+    assert cache.get("keep") == "value"
+
+def test_cache_thread_safety(cache):
+    """Test thread safety."""
+    def writer():
+        for i in range(100):
+            cache.set(f"key_{i}", f"value_{i}")
+            time.sleep(0.001)
+    
+    def reader():
+        for i in range(100):
+            cache.get(f"key_{i}")
+            time.sleep(0.001)
+    
+    # Create threads
+    writer_thread = threading.Thread(target=writer)
+    reader_thread = threading.Thread(target=reader)
+    
+    # Start threads
+    writer_thread.start()
+    reader_thread.start()
+    
+    # Wait for completion
+    writer_thread.join()
+    reader_thread.join()
+    
+    # No exceptions should have been raised
+
+@cache_result(ttl=1)
+def cached_function(x):
+    """Test function for cache decorator."""
+    return x * 2
+
+def test_cache_decorator():
+    """Test cache decorator."""
+    # First call - cache miss
+    result1 = cached_function(5)
+    assert result1 == 10
+    
+    # Second call - cache hit
+    result2 = cached_function(5)
+    assert result2 == 10
+    
+    # Different argument - cache miss
+    result3 = cached_function(6)
+    assert result3 == 12
     
     # Wait for expiry
     time.sleep(1.1)
-    assert cache_manager.get("expire_key") is None
+    
+    # Should be recomputed
+    result4 = cached_function(5)
+    assert result4 == 10
 
-def test_cache_capacity(cache_manager):
-    """Test cache capacity limits"""
-    # Fill cache to capacity
-    large_data = "x" * 500_000  # 500KB
-    assert cache_manager.set("large_key1", large_data)
-    assert cache_manager.set("large_key2", large_data)
+def test_cache_events(cache_manager, cache):
+    """Test cache events."""
+    events = []
+    def monitor(event):
+        events.append(event)
     
-    # This should fail as it exceeds max size
-    assert not cache_manager.set("large_key3", "x" * 1_100_000)
+    cache_manager.add_monitor(monitor)
+    cache_manager.register_cache("test", cache)
     
-    # Verify first entries
-    assert cache_manager.get("large_key1") is not None
-    assert cache_manager.get("large_key2") is not None
-
-def test_cache_entry_count(cache_manager):
-    """Test maximum entry count"""
-    # Add max_entries + 1 items
-    for i in range(11):
-        cache_manager.set(f"key_{i}", f"value_{i}")
+    # Generate events
+    cache.set("test", "value")
+    value = cache.get("test")  # Hit
+    value = cache.get("missing")  # Miss
     
-    # Verify oldest entry was removed
-    assert cache_manager.get("key_0") is None
-    assert cache_manager.get("key_10") is not None
-
-def test_persistent_cache(cache_manager):
-    """Test disk persistence"""
-    # Set with persistence
-    test_value = "persist_value"
-    assert cache_manager.set("persist_key", test_value, persist=True)
+    # Fill cache to trigger eviction
+    for i in range(20):
+        cache.set(f"key_{i}", "x" * 1000, size_estimate=1000)
     
-    # Verify it's in memory
-    assert cache_manager.get("persist_key") == test_value
-    
-    # Clear memory cache
-    cache_manager.clear()
-    
-    # Verify memory cache is empty
-    assert "persist_key" not in cache_manager.entries
-    
-    # Should still be available from disk
-    assert cache_manager.get("persist_key") == test_value
-    
-    # Verify it's back in memory after loading from disk
-    assert "persist_key" in cache_manager.entries
-
-def test_cache_stats(cache_manager):
-    """Test cache statistics"""
-    test_value = "stats_value"
-    cache_manager.set("stats_key", test_value)
-    
-    # Get twice to increment hits
-    cache_manager.get("stats_key")
-    cache_manager.get("stats_key")
-    
-    stats = cache_manager.get_stats()
-    assert stats["entries_count"] == 1
-    assert stats["total_size"] > 0
-    assert stats["total_hits"] == 2
-    assert stats["disk_cache_size"] == 0  # No persistent cache yet
-    assert 0 <= stats["utilization"] <= 100
-    
-    # Test with persistent cache
-    cache_manager.set("persist_key", test_value, persist=True)
-    stats = cache_manager.get_stats()
-    assert stats["disk_cache_size"] > 0
-
-def test_search_cache_operations(search_cache):
-    """Test search cache specific operations"""
-    results = ["result1", "result2"]
-    context = {"filter": "test"}
-    
-    # Cache search results
-    search_cache.cache_search_results("test query", results, context)
-    
-    # Retrieve with same context
-    cached = search_cache.get_search_results("test query", context)
-    assert cached == results
-    
-    # Different context should miss
-    assert search_cache.get_search_results("test query", {"filter": "other"}) is None
-
-def test_cache_clear(cache_manager):
-    """Test cache clearing"""
-    # Add some entries
-    cache_manager.set("clear_key1", "value1")
-    cache_manager.set("clear_key2", "value2")
-    
-    # Clear cache
-    cache_manager.clear()
-    
-    # Verify all entries are gone
-    assert cache_manager.get("clear_key1") is None
-    assert cache_manager.get("clear_key2") is None
-
-def test_cache_error_handling(cache_manager):
-    """Test error handling"""
-    # Test with un-pickle-able object
-    class UnpickleableObject:
-        def __getstate__(self):
-            raise pickle.PickleError("Cannot pickle")
-    
-    # Should return False but not raise
-    assert not cache_manager.set("error_key", UnpickleableObject())
-    assert cache_manager.get("error_key") is None
-    
-    # Should handle None values
-    assert cache_manager.set("none_key", None)
-    assert cache_manager.get("none_key") is None
-    
-    # Test with invalid disk cache
-    if not os.path.exists("cache"):
-        os.makedirs("cache")
-    with open(os.path.join("cache", "invalid.cache"), "wb") as f:
-        f.write(b"invalid data")
-    assert cache_manager.get("invalid") is None
+    # Check events
+    event_types = [e.type for e in events]
+    assert CacheEventType.HIT in event_types
+    assert CacheEventType.MISS in event_types
+    assert CacheEventType.EVICT in event_types

@@ -22,36 +22,50 @@ class DataAugmentor(QWidget):
         """Setup the UI components."""
         layout = QVBoxLayout(self)
         
-        # Augmentation methods
-        self.noise_check = QCheckBox("Add Gaussian Noise")
-        self.noise_strength = QDoubleSpinBox()
-        self.noise_strength.setRange(0.01, 1.0)
-        self.noise_strength.setValue(0.1)
+        # Augmentation method selection
+        method_layout = QHBoxLayout()
+        self.augmentation_combo = QComboBox()
+        self.augmentation_combo.addItems([
+            "Add Noise",
+            "Random Rotation",
+            "Random Flip",
+            "Random Scaling"
+        ])
+        method_layout.addWidget(QLabel("Augmentation Method:"))
+        method_layout.addWidget(self.augmentation_combo)
+        layout.addLayout(method_layout)
         
-        self.rotation_check = QCheckBox("Random Rotation")
+        # Parameters for each method
+        params_layout = QVBoxLayout()
+        
+        # Noise parameters
+        noise_layout = QHBoxLayout()
+        self.noise_std = QDoubleSpinBox()
+        self.noise_std.setRange(0.01, 1.0)
+        self.noise_std.setValue(0.1)
+        noise_layout.addWidget(QLabel("Noise Std:"))
+        noise_layout.addWidget(self.noise_std)
+        params_layout.addLayout(noise_layout)
+        
+        # Rotation parameters
+        rotation_layout = QHBoxLayout()
         self.rotation_angle = QDoubleSpinBox()
         self.rotation_angle.setRange(0, 180)
         self.rotation_angle.setValue(30)
+        rotation_layout.addWidget(QLabel("Rotation Angle:"))
+        rotation_layout.addWidget(self.rotation_angle)
+        params_layout.addLayout(rotation_layout)
         
-        self.flip_check = QCheckBox("Random Flip")
-        
-        self.scale_check = QCheckBox("Random Scaling")
+        # Scale parameters
+        scale_layout = QHBoxLayout()
         self.scale_factor = QDoubleSpinBox()
         self.scale_factor.setRange(0.5, 2.0)
         self.scale_factor.setValue(1.2)
+        scale_layout.addWidget(QLabel("Scale Factor:"))
+        scale_layout.addWidget(self.scale_factor)
+        params_layout.addLayout(scale_layout)
         
-        # Add controls to layout
-        for control in [
-            (self.noise_check, self.noise_strength),
-            (self.rotation_check, self.rotation_angle),
-            (self.flip_check, None),
-            (self.scale_check, self.scale_factor)
-        ]:
-            h_layout = QHBoxLayout()
-            h_layout.addWidget(control[0])
-            if control[1]:
-                h_layout.addWidget(control[1])
-            layout.addLayout(h_layout)
+        layout.addLayout(params_layout)
         
         # Augment button
         self.augment_btn = QPushButton("Augment Data")
@@ -62,6 +76,8 @@ class DataAugmentor(QWidget):
         """Initialize internal state."""
         self.data = None
         self.labels = None
+        self.augmented_data = None
+        self.augmented_labels = None
         
     def set_data(self, data, labels=None):
         """Set data for augmentation."""
@@ -81,38 +97,32 @@ class DataAugmentor(QWidget):
             augmented_data = self.data.clone()
             augmented_labels = self.labels.clone() if self.labels is not None else None
             
-            if self.noise_check.isChecked():
+            method = self.augmentation_combo.currentText()
+            
+            if method == "Add Noise":
                 augmented_data = self._add_noise(augmented_data)
-                
-            if self.rotation_check.isChecked():
+            elif method == "Random Rotation":
                 augmented_data = self._rotate_data(augmented_data)
-                
-            if self.flip_check.isChecked():
+            elif method == "Random Flip":
                 augmented_data = self._flip_data(augmented_data)
-                
-            if self.scale_check.isChecked():
+            elif method == "Random Scaling":
                 augmented_data = self._scale_data(augmented_data)
             
-            # Combine original and augmented data
-            combined_data = torch.cat([self.data, augmented_data])
-            if augmented_labels is not None:
-                combined_labels = torch.cat([self.labels, augmented_labels])
-            else:
-                combined_labels = None
+            # Store augmented data
+            self.augmented_data = augmented_data
+            self.augmented_labels = augmented_labels
             
-            self.augmentation_completed.emit(combined_data, combined_labels)
+            # Emit the augmented data
+            self.augmentation_completed.emit(self.augmented_data, self.augmented_labels)
             
         except Exception as e:
             self.logger.error(f"Error augmenting data: {str(e)}")
+            raise
             
     def _add_noise(self, data):
         """Add Gaussian noise to data."""
-        try:
-            noise = torch.randn_like(data) * self.noise_strength.value()
-            return data + noise
-        except Exception as e:
-            self.logger.error(f"Error adding noise: {str(e)}")
-            return data
+        noise = torch.randn_like(data) * self.noise_std.value()
+        return data + noise
             
     def _rotate_data(self, data):
         """Rotate data if applicable."""
@@ -149,8 +159,4 @@ class DataAugmentor(QWidget):
     def reset(self):
         """Reset augmentor state."""
         self._initialize_state()
-        self.noise_check.setChecked(False)
-        self.rotation_check.setChecked(False)
-        self.flip_check.setChecked(False)
-        self.scale_check.setChecked(False)
         self.augment_btn.setEnabled(False)

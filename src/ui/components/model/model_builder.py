@@ -17,16 +17,14 @@ class LayerConfig:
         
     def create_layer(self) -> nn.Module:
         """Create a PyTorch layer from configuration."""
-        try:
-            layer_class = getattr(nn, self.layer_type)
-            return layer_class(**self.params)
-        except Exception as e:
-            raise ValueError(f"Error creating layer: {str(e)}")
+        layer_class = getattr(nn, self.layer_type)  # Let AttributeError propagate
+        return layer_class(**self.params)
 
 class ModelBuilder(QWidget):
     """Widget for building neural network models."""
     
     model_created = pyqtSignal(object)  # Emits created model
+    model_updated = pyqtSignal(object)  # Emits created model when updated
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -83,6 +81,10 @@ class ModelBuilder(QWidget):
         create_btn = QPushButton("Create Model")
         create_btn.clicked.connect(self._create_model)
         button_layout.addWidget(create_btn)
+        
+        update_btn = QPushButton("Update Model")
+        update_btn.clicked.connect(self._update_model)
+        button_layout.addWidget(update_btn)
         
         layout.addLayout(button_layout)
         
@@ -157,7 +159,7 @@ class ModelBuilder(QWidget):
             container = QWidget()
             container.setLayout(param_layout)
             self.param_layout.addWidget(container)
-            self.param_widgets[name] = container
+            self.param_widgets[name] = widget  # Store the actual input widget
             
         except Exception as e:
             self.logger.error(f"Error adding param widget: {str(e)}", exc_info=True)
@@ -169,14 +171,13 @@ class ModelBuilder(QWidget):
             params = {}
             
             for name, widget in self.param_widgets.items():
-                param_widget = widget.layout().itemAt(1).widget()
-                if isinstance(param_widget, QSpinBox):
+                if isinstance(widget, QSpinBox):
                     if name == "p":  # Handle dropout probability
-                        params[name] = param_widget.value() / 100.0
+                        params[name] = widget.value() / 100.0
                     else:
-                        params[name] = param_widget.value()
-                elif isinstance(param_widget, QDoubleSpinBox):
-                    params[name] = param_widget.value()
+                        params[name] = widget.value()
+                elif isinstance(widget, QDoubleSpinBox):
+                    params[name] = widget.value()
                         
             layer_config = LayerConfig(layer_type, params)
             self.layers.append(layer_config)
@@ -202,6 +203,32 @@ class ModelBuilder(QWidget):
         try:
             if not self.layers:
                 self.logger.warning("No layers added to model")
+                return None
+                
+            # Create ordered dict of layers
+            layers = OrderedDict()
+            for i, config in enumerate(self.layers):
+                try:
+                    layer = config.create_layer()
+                    layers[f"{config.layer_type}_{i}"] = layer
+                except Exception as e:
+                    self.logger.error(f"Error creating layer {i}: {str(e)}")
+                    return None
+                    
+            # Create sequential model
+            model = nn.Sequential(layers)
+            self.model_created.emit(model)
+            return model  # Return the created model
+            
+        except Exception as e:
+            self.logger.error(f"Error creating model: {str(e)}", exc_info=True)
+            return None
+            
+    def _update_model(self):
+        """Update the current model."""
+        try:
+            if not self.layers:
+                self.logger.warning("No layers added to model")
                 return
                 
             # Create ordered dict of layers
@@ -216,10 +243,11 @@ class ModelBuilder(QWidget):
                     
             # Create sequential model
             model = nn.Sequential(layers)
-            self.model_created.emit(model)
+            self.model_updated.emit(model)
+            self.logger.info(f"Updated model")
             
         except Exception as e:
-            self.logger.error(f"Error creating model: {str(e)}", exc_info=True)
+            self.logger.error(f"Error updating model: {str(e)}", exc_info=True)
             
     def reset(self):
         """Reset builder state."""

@@ -32,74 +32,68 @@ def sample_model():
         nn.Linear(5, 1)
     )
 
-class TestPlotBase:
-    """Test PlotBase component."""
-    
-    def test_initialization(self, app):
-        """Test component initialization."""
-        plot = PlotBase()
-        assert plot is not None
-        assert plot.canvas is not None
-        assert plot.figure is not None
-        
-    def test_clear_plot(self, app):
-        """Test plot clearing."""
-        plot = PlotBase()
-        ax = plot.figure.add_subplot(111)
-        ax.plot([1, 2, 3], [1, 2, 3])
-        plot.clear_plot()
-        assert len(plot.figure.axes) == 0
-        
-    def test_set_title(self, app):
-        """Test setting plot title."""
-        plot = PlotBase()
-        title = "Test Plot"
-        plot.set_title(title)
-        assert plot.figure._suptitle.get_text() == title
+# PlotBase Tests
+def test_plot_base_initialization(app):
+    """Test plot base component initialization."""
+    plot = PlotBase()
+    assert plot is not None
+    assert plot.canvas is not None
+    assert plot.figure is not None
 
-class TestDistributionPlot:
-    """Test DistributionPlot component."""
-    
-    def test_initialization(self, app):
-        """Test component initialization."""
-        plot = DistributionPlot()
-        assert plot is not None
-        assert isinstance(plot, PlotBase)
-        
-    def test_plot_distribution(self, app, sample_data):
-        """Test distribution plotting."""
-        plot = DistributionPlot()
-        plot.plot_distribution(sample_data[:, 0], "Feature 1")
-        assert len(plot.figure.axes) > 0
-        
-    def test_plot_correlation_matrix(self, app, sample_data):
-        """Test correlation matrix plotting."""
-        plot = DistributionPlot()
-        df = pd.DataFrame(sample_data)
-        plot.plot_correlation_matrix(df)
-        assert len(plot.figure.axes) > 0
+def test_clear_plot(app):
+    """Test plot clearing."""
+    plot = PlotBase()
+    ax = plot.figure.add_subplot(111)
+    ax.plot([1, 2, 3], [1, 2, 3])
+    plot.clear_plot()
+    assert len(plot.figure.axes) == 0
 
-class TestModelPlot:
-    """Test ModelPlot component."""
-    
-    def test_initialization(self, app):
-        """Test component initialization."""
-        plot = ModelPlot()
-        assert plot is not None
-        assert isinstance(plot, PlotBase)
-        
-    def test_plot_layer_weights(self, app, sample_model):
-        """Test layer weights plotting."""
-        plot = ModelPlot()
-        plot.plot_layer_weights(sample_model)
-        assert len(plot.figure.axes) > 0
-        
-    def test_plot_loss_curve(self, app):
-        """Test loss curve plotting."""
-        plot = ModelPlot()
-        losses = [0.5, 0.4, 0.3, 0.2, 0.1]
-        val_losses = [0.6, 0.5, 0.4, 0.3, 0.2]
-        plot.plot_loss_curve(losses, val_losses)
-        assert len(plot.figure.axes) > 0
-        ax = plot.figure.axes[0]
-        assert len(ax.lines) == 2  # Training and validation curves
+def test_set_title(app):
+    """Test setting plot title."""
+    plot = PlotBase()
+    title = "Test Plot"
+    plot.set_title(title)
+    assert plot.figure._suptitle.get_text() == title
+
+# DistributionPlot Tests
+def test_distribution_plot_initialization(app):
+    """Test distribution plot component initialization."""
+    plot = DistributionPlot()
+    assert plot is not None
+    assert isinstance(plot, PlotBase)
+
+def test_plot_distribution(app, sample_data):
+    """Test distribution plotting."""
+    plot = DistributionPlot()
+    plot.plot_distribution(sample_data[:, 0], "Feature 1")
+    assert len(plot.figure.axes) > 0
+
+def test_plot_correlation_matrix(app, sample_data):
+    """Test correlation matrix plotting."""
+    plot = DistributionPlot()
+    df = pd.DataFrame(sample_data)
+    plot.plot_correlation_matrix(df)
+    assert len(plot.figure.axes) > 0
+
+# ModelPlot Tests
+def test_model_plot_initialization(app):
+    """Test model plot component initialization."""
+    plot = ModelPlot()
+    assert plot is not None
+    assert isinstance(plot, PlotBase)
+
+def test_plot_layer_weights(app, sample_model):
+    """Test layer weights plotting."""
+    plot = ModelPlot()
+    plot.plot_layer_weights(sample_model)
+    assert len(plot.figure.axes) > 0
+
+def test_plot_loss_curve(app):
+    """Test loss curve plotting."""
+    plot = ModelPlot()
+    losses = [0.5, 0.4, 0.3, 0.2, 0.1]
+    val_losses = [0.6, 0.5, 0.4, 0.3, 0.2]
+    plot.plot_loss_curve(losses, val_losses)
+    assert len(plot.figure.axes) > 0
+    ax = plot.figure.axes[0]
+    assert len(ax.lines) == 2  # Training and validation curves

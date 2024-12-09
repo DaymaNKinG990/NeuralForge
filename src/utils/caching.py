@@ -1,509 +1,276 @@
-from typing import Any, Dict, Optional, List, Tuple
+"""Enhanced caching system with lazy loading integration and metric-specific optimizations."""
+from typing import Any, Callable, Dict, Optional, TypeVar, Generic, List, Set
+from dataclasses import dataclass, field
 import time
-import json
-import os
-import pickle
-from dataclasses import dataclass
-from datetime import datetime
+import weakref
 import threading
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import psutil
+from enum import Enum
+from .lazy_loading import LoadPriority, component_loader
+from functools import wraps
+
+T = TypeVar('T')
+
+class CacheEventType(Enum):
+    """Cache event types for monitoring."""
+    HIT = "hit"
+    MISS = "miss"
+    EVICT = "evict"
+    EXPIRE = "expire"
+    PREFETCH = "prefetch"
+    MEMORY_PRESSURE = "memory_pressure"
 
 @dataclass
-class CacheEntry:
-    """Элемент кэша с метаданными"""
+class CacheEvent:
+    """Cache event for monitoring."""
+    type: CacheEventType
     key: str
-    value: Any
+    timestamp: float = field(default_factory=time.time)
+    details: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class CacheEntry(Generic[T]):
+    """Cache entry with metadata."""
+    value: T
     expiry: float
-    size: int
-    last_access: float
-    access_count: int
+    last_access: float = field(default_factory=time.time)
+    access_count: int = 0
+    size_estimate: int = 0
+    priority: LoadPriority = LoadPriority.MEDIUM
+    weak_ref: Optional[weakref.ref] = None
+    metric_type: Optional[str] = None
+    prefetch: bool = False
 
 class CacheManager:
-    """Менеджер кэширования с различными стратегиями"""
-    
-    def __init__(self, max_size_mb: float = 100, max_entries: int = 1000):
-        self.max_size = max_size_mb * 1024 * 1024  # Конвертируем в байты
-        self.max_entries = max_entries
-        self.entries: Dict[str, CacheEntry] = {}
-        self._lock = threading.Lock()
-        self._disk_cache_dir = "cache"
-        self._logger = logging.getLogger(__name__)
-        self._executor = ThreadPoolExecutor(max_workers=2)
-        
-        # Создаем директорию для дискового кэша
-        os.makedirs(self._disk_cache_dir, exist_ok=True)
-        self._logger.info(
-            "Cache manager initialized",
-            extra={
-                "max_size_mb": max_size_mb,
-                "max_entries": max_entries,
-                "cache_dir": self._disk_cache_dir
-            }
-        )
-        
-    def get(self, key: str) -> Optional[Any]:
-        """Получить значение из кэша"""
-        with self._lock:
-            entry = self.entries.get(key)
-            if entry:
-                current_time = time.time()
-                
-                # Проверяем срок действия
-                if entry.expiry and current_time > entry.expiry:
-                    self._logger.debug(
-                        f"Cache entry expired: {key}",
-                        extra={
-                            "key": key,
-                            "expiry_time": entry.expiry,
-                            "current_time": current_time,
-                            "ttl_remaining": entry.expiry - current_time
-                        }
-                    )
-                    del self.entries[key]
-                    return None
-                    
-                # Обновляем статистику доступа
-                entry.last_access = current_time
-                entry.access_count += 1
-                self._logger.debug(
-                    f"Cache hit: {key}",
-                    extra={
-                        "key": key,
-                        "access_count": entry.access_count,
-                        "size": entry.size,
-                        "age": current_time - entry.last_access
-                    }
-                )
-                return entry.value
-                
-            # Пробуем получить из дискового кэша
-            self._logger.debug(
-                f"Cache miss (memory): {key}, trying disk cache",
-                extra={"key": key}
-            )
-            disk_value = self._get_from_disk(key)
-            if disk_value is not None:
-                self._logger.debug(
-                    f"Disk cache hit: {key}",
-                    extra={"key": key}
-                )
-                # Помещаем значение в память
-                self.set(key, disk_value)
-            else:
-                self._logger.debug(
-                    f"Complete cache miss: {key}",
-                    extra={"key": key}
-                )
-            return disk_value
-        
-    def set(self, key: str, value: Any, ttl: Optional[float] = None,
-            persist: bool = False) -> bool:
-        """Сохранить значение в кэш"""
-        try:
-            # Оцениваем размер значения
-            size = self._estimate_size(value)
-            
-            with self._lock:
-                # Проверяем, хватает ли места
-                if size > self.max_size:
-                    self._logger.warning(
-                        f"Value too large for cache: {key}",
-                        extra={
-                            "key": key,
-                            "value_size": size,
-                            "max_size": self.max_size,
-                            "current_usage": sum(e.size for e in self.entries.values())
-                        }
-                    )
-                    return False
-                    
-                # Освобождаем место если нужно
-                self._ensure_capacity(size)
-                
-                # Создаем запись
-                expiry = time.time() + ttl if ttl else None
-                entry = CacheEntry(
-                    key=key,
-                    value=value,
-                    expiry=expiry,
-                    size=size,
-                    last_access=time.time(),
-                    access_count=0
-                )
-                
-                self.entries[key] = entry
-                self._logger.info(
-                    f"Cache entry set: {key}",
-                    extra={
-                        "key": key,
-                        "size": size,
-                        "ttl": ttl,
-                        "persist": persist,
-                        "expiry": expiry,
-                        "total_entries": len(self.entries),
-                        "total_size": sum(e.size for e in self.entries.values())
-                    }
-                )
-                
-                # Асинхронно сохраняем на диск если нужно
-                if persist:
-                    self._executor.submit(self._save_to_disk, key, entry)
-                    
-                return True
-        except Exception as e:
-            self._logger.error(
-                f"Error setting cache entry: {key}",
-                exc_info=True,
-                extra={
-                    "key": key,
-                    "error_type": type(e).__name__,
-                    "error_msg": str(e)
-                }
-            )
-            return False
-            
-    def _ensure_capacity(self, required_size: int):
-        """Освобождаем место в кэше"""
-        current_size = sum(entry.size for entry in self.entries.values())
-        removed_entries = []
-        
-        while (len(self.entries) >= self.max_entries or 
-               current_size + required_size > self.max_size):
-            if not self.entries:
-                self._logger.error(
-                    "Cannot free enough cache space",
-                    extra={
-                        "required_size": required_size,
-                        "current_size": current_size,
-                        "max_size": self.max_size
-                    }
-                )
-                raise ValueError("Cannot free enough cache space")
-                
-            # Удаляем наименее используемые записи
-            entry_to_remove = min(
-                self.entries.items(),
-                key=lambda x: (x[1].access_count, -x[1].last_access)
-            )
-            
-            removed_entries.append({
-                "key": entry_to_remove[0],
-                "size": entry_to_remove[1].size,
-                "access_count": entry_to_remove[1].access_count,
-                "last_access": entry_to_remove[1].last_access
-            })
-            
-            del self.entries[entry_to_remove[0]]
-            current_size -= entry_to_remove[1].size
-            
-        if removed_entries:
-            self._logger.info(
-                "Removed cache entries to ensure capacity",
-                extra={
-                    "removed_count": len(removed_entries),
-                    "freed_space": sum(e["size"] for e in removed_entries),
-                    "removed_entries": removed_entries,
-                    "current_size": current_size,
-                    "required_size": required_size
-                }
-            )
-            
-    def _estimate_size(self, value: Any) -> int:
-        """Оценить размер значения в байтах"""
-        try:
-            return len(pickle.dumps(value))
-        except Exception:
-            return len(str(value).encode())
-            
-    def _get_from_disk(self, key: str) -> Optional[Any]:
-        """Получить значение из дискового кэша"""
-        try:
-            cache_file = os.path.join(self._disk_cache_dir, f"{key}.cache")
-            if not os.path.exists(cache_file):
-                return None
-                
-            start_time = time.time()
-            with open(cache_file, 'rb') as f:
-                try:
-                    entry = pickle.load(f)
-                    if not isinstance(entry, CacheEntry):
-                        self._logger.error(
-                            f"Invalid cache entry format: {key}",
-                            extra={"key": key, "type": type(entry)}
-                        )
-                        os.remove(cache_file)
-                        return None
-                        
-                    load_time = time.time() - start_time
-                    
-                    # Check expiry
-                    if entry.expiry and time.time() > entry.expiry:
-                        self._logger.debug(
-                            f"Disk cache entry expired: {key}",
-                            extra={
-                                "key": key,
-                                "expiry_time": entry.expiry,
-                                "file_size": os.path.getsize(cache_file)
-                            }
-                        )
-                        os.remove(cache_file)
-                        return None
-                        
-                    self._logger.debug(
-                        f"Loaded from disk cache: {key}",
-                        extra={
-                            "key": key,
-                            "load_time": load_time,
-                            "file_size": os.path.getsize(cache_file),
-                            "entry_size": entry.size
-                        }
-                    )
-                    return entry.value
-                except (pickle.UnpicklingError, AttributeError, EOFError) as e:
-                    self._logger.error(
-                        f"Error unpickling cache entry: {key}",
-                        exc_info=True,
-                        extra={"key": key, "error": str(e)}
-                    )
-                    os.remove(cache_file)
-                    return None
-                    
-        except OSError as e:
-            self._logger.error(
-                f"Error reading from disk cache: {key}",
-                exc_info=True,
-                extra={
-                    "key": key,
-                    "error_type": type(e).__name__,
-                    "error_msg": str(e)
-                }
-            )
-            try:
-                if os.path.exists(cache_file):
-                    os.remove(cache_file)
-            except OSError:
-                pass
-        return None
-        
-    def _save_to_disk(self, key: str, entry: CacheEntry):
-        """Сохранить значение в дисковый кэш"""
-        try:
-            start_time = time.time()
-            cache_file = os.path.join(self._disk_cache_dir, f"{key}.cache")
-            temp_file = cache_file + '.tmp'
-            
-            with open(temp_file, 'wb') as f:
-                pickle.dump(entry, f)
-            os.replace(temp_file, cache_file)
-            
-            save_time = time.time() - start_time
-            self._logger.debug(
-                f"Saved to disk cache: {key}",
-                extra={
-                    "key": key,
-                    "save_time": save_time,
-                    "file_size": os.path.getsize(cache_file),
-                    "entry_size": entry.size
-                }
-            )
-        except (OSError, pickle.PicklingError) as e:
-            self._logger.error(
-                f"Error writing to disk cache: {key}",
-                exc_info=True,
-                extra={
-                    "key": key,
-                    "error_type": type(e).__name__,
-                    "error_msg": str(e),
-                    "entry_size": entry.size
-                }
-            )
-            try:
-                os.remove(temp_file)
-            except OSError:
-                pass
-            
-    def _get_disk_cache_size(self) -> int:
-        """Получить размер дискового кэша"""
-        try:
-            total_size = 0
-            if os.path.exists(self._disk_cache_dir):
-                for file in os.listdir(self._disk_cache_dir):
-                    if file.endswith('.cache'):
-                        try:
-                            file_path = os.path.join(self._disk_cache_dir, file)
-                            total_size += os.path.getsize(file_path)
-                        except OSError as e:
-                            self._logger.error(
-                                f"Error getting cache file size: {file}",
-                                exc_info=True,
-                                extra={"file": file, "error": str(e)}
-                            )
-            return total_size
-        except Exception as e:
-            self._logger.error(
-                "Error calculating disk cache size",
-                exc_info=True,
-                extra={"error": str(e)}
-            )
-            return 0
-
-    def clear(self, older_than: Optional[float] = None):
-        """Очистить кэш"""
-        with self._lock:
-            initial_memory_entries = len(self.entries)
-            initial_memory_size = sum(e.size for e in self.entries.values())
-            
-            if older_than is None:
-                self.entries.clear()
-                # Очищаем дисковый кэш
-                disk_files_removed = 0
-                disk_size_freed = 0
-                
-                if os.path.exists(self._disk_cache_dir):
-                    for file in os.listdir(self._disk_cache_dir):
-                        if file.endswith('.cache'):
-                            try:
-                                file_path = os.path.join(self._disk_cache_dir, file)
-                                file_size = os.path.getsize(file_path)
-                                os.remove(file_path)
-                                disk_files_removed += 1
-                                disk_size_freed += file_size
-                            except OSError as e:
-                                self._logger.error(
-                                    f"Error removing cache file: {file}",
-                                    exc_info=True,
-                                    extra={"file": file, "error": str(e)}
-                                )
-                
-                self._logger.info(
-                    "Cache cleared completely",
-                    extra={
-                        "memory_entries_removed": initial_memory_entries,
-                        "memory_size_freed": initial_memory_size,
-                        "disk_files_removed": disk_files_removed,
-                        "disk_size_freed": disk_size_freed
-                    }
-                )
-            else:
-                current_time = time.time()
-                # Очищаем память
-                old_entries = {
-                    k: v for k, v in self.entries.items()
-                    if v.last_access <= current_time - older_than
-                }
-                for k in old_entries:
-                    del self.entries[k]
-                
-                # Очищаем диск
-                disk_files_removed = 0
-                disk_size_freed = 0
-                
-                if os.path.exists(self._disk_cache_dir):
-                    for file in os.listdir(self._disk_cache_dir):
-                        if file.endswith('.cache'):
-                            try:
-                                file_path = os.path.join(self._disk_cache_dir, file)
-                                if os.path.getmtime(file_path) <= current_time - older_than:
-                                    file_size = os.path.getsize(file_path)
-                                    os.remove(file_path)
-                                    disk_files_removed += 1
-                                    disk_size_freed += file_size
-                            except OSError as e:
-                                self._logger.error(
-                                    f"Error removing old cache file: {file}",
-                                    exc_info=True,
-                                    extra={"file": file, "error": str(e)}
-                                )
-                
-                self._logger.info(
-                    "Old cache entries cleared",
-                    extra={
-                        "older_than": older_than,
-                        "memory_entries_removed": len(old_entries),
-                        "memory_size_freed": sum(e.size for e in old_entries.values()),
-                        "disk_files_removed": disk_files_removed,
-                        "disk_size_freed": disk_size_freed
-                    }
-                )
-                
-    def get_stats(self) -> Dict[str, Any]:
-        """Получить статистику кэша"""
-        with self._lock:
-            try:
-                entries = list(self.entries.values())
-                total_size = sum(entry.size for entry in entries)
-                total_hits = sum(entry.access_count for entry in entries)
-                avg_access_count = total_hits / len(entries) if entries else 0
-                
-                disk_size = self._get_disk_cache_size()
-                
-                return {
-                    'entries_count': len(self.entries),
-                    'total_size': total_size,
-                    'total_hits': total_hits,
-                    'size_limit': self.max_size,
-                    'utilization': (total_size / self.max_size * 100) 
-                                 if self.max_size > 0 else 0,
-                    'disk_cache_size': disk_size,
-                    'avg_access_count': avg_access_count,
-                    'memory_utilization': len(self.entries) / self.max_entries * 100
-                                        if self.max_entries > 0 else 0
-                }
-            except Exception as e:
-                self._logger.error(
-                    "Error getting cache stats",
-                    exc_info=True,
-                    extra={"error": str(e)}
-                )
-                return {
-                    'entries_count': 0,
-                    'total_size': 0,
-                    'total_hits': 0,
-                    'size_limit': self.max_size,
-                    'utilization': 0,
-                    'disk_cache_size': 0,
-                    'avg_access_count': 0,
-                    'memory_utilization': 0
-                }
-
-    def clear_model_cache(self, model_name: str) -> None:
-        """Clear cache entries for a specific model"""
-        with self._lock:
-            keys_to_remove = [
-                key for key in list(self.entries.keys())
-                if key.startswith(f"model_{model_name}_")
-            ]
-            for key in keys_to_remove:
-                del self.entries[key]
-            self._logger.info(f"Cleared cache for model: {model_name}")
-
-class SearchCache(CacheManager):
-    """Специализированный кэш для результатов поиска"""
+    """Manages cache configuration and monitoring."""
     
     def __init__(self):
-        super().__init__(max_size_mb=50, max_entries=500)
-        
-    def cache_search_results(self, query: str, results: List[Any],
-                           context: Dict[str, Any] = None):
-        """Кэшировать результаты поиска"""
-        cache_key = self._make_cache_key(query, context)
-        self.set(cache_key, results, ttl=3600)  # Кэшируем на 1 час
-        
-    def get_search_results(self, query: str,
-                          context: Dict[str, Any] = None) -> Optional[List[Any]]:
-        """Получить кэшированные результаты поиска"""
-        cache_key = self._make_cache_key(query, context)
-        return self.get(cache_key)
-        
-    def _make_cache_key(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """Создать ключ кэша для поискового запроса"""
-        if context:
-            # Сортируем ключи контекста для консистентности
-            context_str = json.dumps(context, sort_keys=True)
-            return f"search:{query}:{context_str}"
-        return f"search:{query}"
+        """Initialize cache manager."""
+        self._caches: Dict[str, 'Cache'] = {}
+        self._monitors: List[Callable[[CacheEvent], None]] = []
+        self._lock = threading.Lock()
+    
+    def register_cache(self, name: str, cache: 'Cache'):
+        """Register a cache instance."""
+        with self._lock:
+            self._caches[name] = cache
+    
+    def get_cache(self, name: str) -> Optional['Cache']:
+        """Get a registered cache by name."""
+        return self._caches.get(name)
+    
+    def add_monitor(self, monitor: Callable[[CacheEvent], None]):
+        """Add a cache event monitor."""
+        self._monitors.append(monitor)
+    
+    def notify_event(self, event: CacheEvent):
+        """Notify monitors of cache event."""
+        for monitor in self._monitors:
+            try:
+                monitor(event)
+            except Exception as e:
+                logging.error(f"Cache monitor error: {e}")
 
-# Глобальные экземпляры кэшей
+class Cache:
+    """Enhanced cache with lazy loading support and metric optimizations."""
+    
+    def __init__(
+        self,
+        max_size: int = 1000,
+        default_ttl: float = 3600,
+        cleanup_interval: float = 300,
+        memory_limit_mb: Optional[float] = None
+    ):
+        """Initialize cache.
+        
+        Args:
+            max_size: Maximum number of entries
+            default_ttl: Default time-to-live in seconds
+            cleanup_interval: Cleanup interval in seconds
+            memory_limit_mb: Memory limit in MB
+        """
+        self._entries: Dict[str, CacheEntry] = {}
+        self._max_size = max_size
+        self._default_ttl = default_ttl
+        self._cleanup_interval = cleanup_interval
+        self._memory_limit = (memory_limit_mb or 
+                           psutil.virtual_memory().total * 0.1 / (1024 * 1024))
+        self._lock = threading.Lock()
+        self._last_cleanup = time.time()
+        self._current_memory = 0
+        
+        # Start cleanup thread
+        self._cleanup_thread = threading.Thread(target=self._cleanup_worker)
+        self._cleanup_thread.daemon = True
+        self._cleanup_thread.start()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get value from cache."""
+        self._maybe_cleanup()
+        
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                cache_manager.notify_event(CacheEvent(CacheEventType.MISS, key))
+                return None
+                
+            if time.time() > entry.expiry:
+                self._remove_entry(key)
+                cache_manager.notify_event(
+                    CacheEvent(CacheEventType.EXPIRE, key)
+                )
+                return None
+                
+            entry.last_access = time.time()
+            entry.access_count += 1
+            cache_manager.notify_event(CacheEvent(CacheEventType.HIT, key))
+            return entry.value
+    
+    def set(
+        self,
+        key: str,
+        value: Any,
+        ttl: Optional[float] = None,
+        priority: LoadPriority = LoadPriority.MEDIUM,
+        size_estimate: Optional[int] = None,
+        metric_type: Optional[str] = None,
+        prefetch: bool = False
+    ):
+        """Set cache entry."""
+        self._maybe_cleanup()
+        
+        with self._lock:
+            # Check memory limit
+            if self._current_memory >= self._memory_limit:
+                self._evict_entries()
+            
+            # Create entry
+            entry = CacheEntry(
+                value=value,
+                expiry=time.time() + (ttl or self._default_ttl),
+                size_estimate=size_estimate or 1024,
+                priority=priority,
+                metric_type=metric_type,
+                prefetch=prefetch
+            )
+            
+            # Update memory usage
+            self._current_memory += entry.size_estimate
+            
+            # Store entry
+            self._entries[key] = entry
+            
+            # Evict if over size limit
+            if len(self._entries) > self._max_size:
+                self._evict_entries()
+    
+    def _maybe_cleanup(self):
+        """Run cleanup if needed."""
+        if (time.time() - self._last_cleanup) > self._cleanup_interval:
+            self._cleanup()
+    
+    def _cleanup(self):
+        """Clean up expired entries."""
+        with self._lock:
+            current_time = time.time()
+            expired_keys = [
+                key for key, entry in self._entries.items()
+                if current_time > entry.expiry
+            ]
+            
+            for key in expired_keys:
+                self._remove_entry(key)
+                cache_manager.notify_event(
+                    CacheEvent(CacheEventType.EXPIRE, key)
+                )
+            
+            self._last_cleanup = current_time
+    
+    def _cleanup_worker(self):
+        """Background cleanup worker."""
+        while True:
+            time.sleep(self._cleanup_interval)
+            try:
+                self._cleanup()
+            except Exception as e:
+                logging.error(f"Cache cleanup error: {e}")
+    
+    def _remove_entry(self, key: str):
+        """Remove cache entry."""
+        entry = self._entries.pop(key, None)
+        if entry:
+            self._current_memory -= entry.size_estimate
+    
+    def _evict_entries(self):
+        """Evict entries based on priority and usage."""
+        if not self._entries:
+            return
+            
+        # Sort entries by importance
+        entries = sorted(
+            self._entries.items(),
+            key=lambda x: (
+                x[1].priority.value,
+                -x[1].access_count,
+                -x[1].last_access
+            )
+        )
+        
+        # Remove least important entries
+        removed = 0
+        target = len(self._entries) // 2  # Remove half
+        
+        for key, _ in entries[:target]:
+            self._remove_entry(key)
+            cache_manager.notify_event(
+                CacheEvent(CacheEventType.EVICT, key)
+            )
+            removed += 1
+            
+            if self._current_memory < self._memory_limit:
+                break
+
+def cache_result(
+    ttl: Optional[float] = None,
+    priority: LoadPriority = LoadPriority.MEDIUM,
+    metric_type: Optional[str] = None
+):
+    """Cache function results.
+    
+    Args:
+        ttl: Time-to-live in seconds
+        priority: Cache priority
+        metric_type: Type of metric for optimization
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key
+            key = f"{func.__module__}.{func.__name__}:{args}:{kwargs}"
+            
+            # Check cache
+            result = cache.get(key)
+            if result is not None:
+                return result
+                
+            # Call function
+            result = func(*args, **kwargs)
+            
+            # Cache result
+            cache.set(
+                key,
+                result,
+                ttl=ttl,
+                priority=priority,
+                metric_type=metric_type
+            )
+            
+            return result
+        return wrapper
+    return decorator
+
+# Global instances
 cache_manager = CacheManager()
-search_cache = SearchCache()
+cache = Cache()
+cache_manager.register_cache("default", cache)

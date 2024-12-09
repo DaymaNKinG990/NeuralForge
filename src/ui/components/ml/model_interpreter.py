@@ -142,25 +142,57 @@ class ModelInterpreter(QWidget):
     def _interpret_shap(self):
         """Interpret model using SHAP values."""
         try:
-            # Create explainer
-            background = self.data[:100]  # Use first 100 samples as background
-            explainer = shap.DeepExplainer(self.model, background)
+            # Convert model to evaluation mode
+            self.model.eval()
             
-            # Calculate SHAP values
-            shap_values = explainer.shap_values(self.data[:1000])
+            # Create background data
+            background = self.data[:100].clone()  # Use first 100 samples as background
+            
+            # Create explainer
+            def model_wrapper(x):
+                # Convert numpy array to tensor
+                if isinstance(x, np.ndarray):
+                    x = torch.tensor(x, dtype=torch.float32)
+                return self.model(x).detach().numpy()
+                
+            # Create a wrapper that handles batches
+            def batch_predictor(x):
+                if len(x.shape) == 1:
+                    x = x.reshape(1, -1)
+                return model_wrapper(x)
+            
+            # Convert background data to numpy for SHAP
+            background_np = background.detach().numpy()
+            
+            # Initialize explainer with background data
+            explainer = shap.KernelExplainer(
+                batch_predictor,
+                background_np,
+                link="identity"
+            )
+            
+            # Calculate SHAP values for a subset of data
+            sample_data = self.data[:10].detach().numpy()  # Use 10 samples for visualization
+            shap_values = explainer.shap_values(sample_data)
+            
+            # Convert shap_values to numpy array if it's a list
+            if isinstance(shap_values, list):
+                shap_values = np.array(shap_values[0])
+            elif isinstance(shap_values, np.ndarray) and len(shap_values.shape) > 2:
+                shap_values = shap_values[0]  # Take first output for multi-output models
             
             # Plot feature importance
             fig = self.importance_canvas.figure
             fig.clear()
             ax = fig.add_subplot(111)
             
-            shap.summary_plot(
-                shap_values[0],
-                self.data[:1000],
-                feature_names=self.feature_names,
-                show=False
-            )
+            # Calculate mean absolute SHAP values for feature importance
+            feature_importance = np.mean(np.abs(shap_values), axis=0)
+            if len(feature_importance.shape) > 1:
+                feature_importance = feature_importance.mean(axis=1)  # Reduce to 1D array
+            ax.bar(self.feature_names, feature_importance)
             ax.set_title("SHAP Feature Importance")
+            ax.tick_params(axis='x', rotation=45)
             
             fig.tight_layout()
             self.importance_canvas.draw()
@@ -170,21 +202,29 @@ class ModelInterpreter(QWidget):
             fig.clear()
             ax = fig.add_subplot(111)
             
-            shap.force_plot(
-                explainer.expected_value[0],
-                shap_values[0][0],
-                self.data[0],
-                feature_names=self.feature_names,
-                matplotlib=True,
-                show=False
-            )
-            ax.set_title("SHAP Force Plot")
+            # Plot SHAP values for first sample
+            sample_shap = shap_values[0]  # Get first sample's SHAP values
+            if len(sample_shap.shape) > 1:
+                sample_shap = sample_shap.mean(axis=1)  # Reduce to 1D if needed
+            ax.barh(self.feature_names, sample_shap)
+            ax.set_title("SHAP Values for First Sample")
             
             fig.tight_layout()
             self.sample_canvas.draw()
             
+            # Emit interpretation results
+            interpretation_results = {
+                'method': 'SHAP Values',
+                'feature_importance': feature_importance.tolist(),
+                'sample_interpretation': sample_shap.tolist(),
+                'feature_names': self.feature_names,
+                'expected_value': explainer.expected_value if np.isscalar(explainer.expected_value) 
+                                else explainer.expected_value.tolist()
+            }
+            self.interpretation_updated.emit(interpretation_results)
+            
         except Exception as e:
-            self.logger.error(f"Error in SHAP interpretation: {str(e)}")
+            self.logger.error(f"Error in SHAP interpretation: {str(e)}", exc_info=True)
             
     def _interpret_integrated_gradients(self):
         """Interpret model using Integrated Gradients."""
@@ -193,7 +233,7 @@ class ModelInterpreter(QWidget):
             ig = IntegratedGradients(self.model)
             
             # Calculate attributions
-            attributions = ig.attribute(
+            attributions, delta = ig.attribute(
                 self.data[:1000],
                 n_steps=50,
                 return_convergence_delta=True
@@ -204,8 +244,9 @@ class ModelInterpreter(QWidget):
             fig.clear()
             ax = fig.add_subplot(111)
             
-            attr_mean = attributions[0].mean(0).abs()
-            ax.bar(self.feature_names, attr_mean)
+            # Calculate mean absolute attribution for each feature
+            feature_importance = torch.mean(torch.abs(attributions), dim=0)
+            ax.bar(self.feature_names, feature_importance.detach().numpy())
             ax.set_title("Integrated Gradients Feature Importance")
             ax.tick_params(axis='x', rotation=45)
             
@@ -217,7 +258,8 @@ class ModelInterpreter(QWidget):
             fig.clear()
             ax = fig.add_subplot(111)
             
-            sample_attr = attributions[0][0].abs()
+            # Plot attribution for a single sample
+            sample_attr = attributions[0].detach().numpy()
             ax.bar(self.feature_names, sample_attr)
             ax.set_title("Sample Attribution")
             ax.tick_params(axis='x', rotation=45)
@@ -225,8 +267,17 @@ class ModelInterpreter(QWidget):
             fig.tight_layout()
             self.sample_canvas.draw()
             
+            # Emit interpretation results
+            interpretation_data = {
+                'method': 'Integrated Gradients',
+                'feature_importance': feature_importance.detach().numpy().tolist(),
+                'sample_attribution': sample_attr.tolist(),
+                'convergence_delta': delta.mean().item()
+            }
+            self.interpretation_updated.emit(interpretation_data)
+            
         except Exception as e:
-            self.logger.error(f"Error in Integrated Gradients interpretation: {str(e)}")
+            self.logger.error(f"Error in Integrated Gradients interpretation: {str(e)}", exc_info=True)
             
     def _interpret_deeplift(self):
         """Interpret model using DeepLift."""

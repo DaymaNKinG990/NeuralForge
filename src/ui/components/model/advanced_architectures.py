@@ -7,20 +7,18 @@ from typing import List, Optional, Union, Tuple
 class TransformerBlock(nn.Module):
     """Transformer block with multi-head attention."""
     
-    def __init__(self, embed_dim: int,
-                 num_heads: int,
-                 ff_dim: int,
+    def __init__(self, d_model: int, nhead: int,
                  dropout: float = 0.1):
         super().__init__()
-        self.attention = nn.MultiheadAttention(embed_dim, num_heads)
+        self.attention = nn.MultiheadAttention(d_model, nhead)
         self.ff = nn.Sequential(
-            nn.Linear(embed_dim, ff_dim),
+            nn.Linear(d_model, d_model * 4),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(ff_dim, embed_dim)
+            nn.Linear(d_model * 4, d_model)
         )
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -64,7 +62,7 @@ class LSTMWithAttention(nn.Module):
     
     def __init__(self, input_size: int,
                  hidden_size: int,
-                 num_layers: int,
+                 num_layers: int = 1,
                  dropout: float = 0.1):
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size,
@@ -72,13 +70,11 @@ class LSTMWithAttention(nn.Module):
                            batch_first=True)
         self.attention = nn.Linear(hidden_size, 1)
         
-    def forward(self, x: torch.Tensor,
-                h: Optional[Tuple[torch.Tensor, torch.Tensor]] = None
-                ) -> Tuple[torch.Tensor, torch.Tensor]:
-        outputs, (h_n, c_n) = self.lstm(x, h)
-        attention_weights = F.softmax(self.attention(outputs), dim=1)
-        attended = torch.sum(outputs * attention_weights, dim=1)
-        return attended, (h_n, c_n)
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        outputs, _ = self.lstm(x)  # [batch, seq_len, hidden]
+        attention_weights = F.softmax(self.attention(outputs).squeeze(-1), dim=1)  # [batch, seq_len]
+        context = torch.bmm(attention_weights.unsqueeze(1), outputs).squeeze(1)  # [batch, hidden]
+        return context, attention_weights
 
 class DenseNet(nn.Module):
     """DenseNet implementation."""
@@ -223,78 +219,61 @@ class UNet(nn.Module):
 class GAN(nn.Module):
     """Generative Adversarial Network."""
     
-    class Generator(nn.Module):
-        def __init__(self, latent_dim: int,
-                    output_channels: int):
-            super().__init__()
-            self.main = nn.Sequential(
-                # Layer 1
-                nn.ConvTranspose2d(latent_dim, 512,
-                                 kernel_size=4, stride=1,
-                                 padding=0, bias=False),
-                nn.BatchNorm2d(512),
-                nn.ReLU(True),
-                # Layer 2
-                nn.ConvTranspose2d(512, 256,
-                                 kernel_size=4, stride=2,
-                                 padding=1, bias=False),
-                nn.BatchNorm2d(256),
-                nn.ReLU(True),
-                # Layer 3
-                nn.ConvTranspose2d(256, 128,
-                                 kernel_size=4, stride=2,
-                                 padding=1, bias=False),
-                nn.BatchNorm2d(128),
-                nn.ReLU(True),
-                # Layer 4
-                nn.ConvTranspose2d(128, output_channels,
-                                 kernel_size=4, stride=2,
-                                 padding=1, bias=False),
-                nn.Tanh()
-            )
-            
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return self.main(x)
-            
-    class Discriminator(nn.Module):
-        def __init__(self, input_channels: int):
-            super().__init__()
-            self.main = nn.Sequential(
-                # Layer 1
-                nn.Conv2d(input_channels, 64,
-                         kernel_size=4, stride=2,
-                         padding=1, bias=False),
-                nn.LeakyReLU(0.2, inplace=True),
-                # Layer 2
-                nn.Conv2d(64, 128,
-                         kernel_size=4, stride=2,
-                         padding=1, bias=False),
-                nn.BatchNorm2d(128),
-                nn.LeakyReLU(0.2, inplace=True),
-                # Layer 3
-                nn.Conv2d(128, 256,
-                         kernel_size=4, stride=2,
-                         padding=1, bias=False),
-                nn.BatchNorm2d(256),
-                nn.LeakyReLU(0.2, inplace=True),
-                # Layer 4
-                nn.Conv2d(256, 1,
-                         kernel_size=4, stride=1,
-                         padding=0, bias=False),
-                nn.Sigmoid()
-            )
-            
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return self.main(x)
-            
-    def __init__(self, latent_dim: int,
-                 channels: int):
+    def __init__(self, latent_dim: int, img_channels: int):
         super().__init__()
-        self.generator = self.Generator(latent_dim, channels)
-        self.discriminator = self.Discriminator(channels)
+        self.latent_dim = latent_dim
+        self.img_channels = img_channels
         
-    def generate(self, z: torch.Tensor) -> torch.Tensor:
-        return self.generator(z)
+        # Generator
+        self.generator = nn.Sequential(
+            # Input: latent_dim
+            nn.Linear(latent_dim, 512 * 4 * 4),
+            nn.ReLU(True),
+            nn.Unflatten(1, (512, 4, 4)),  # Reshape to (512, 4, 4)
+            
+            # State: 512 x 4 x 4
+            nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.ReLU(True),
+            # State: 256 x 8 x 8
+            nn.ConvTranspose2d(256, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            # State: 128 x 16 x 16
+            nn.ConvTranspose2d(128, 64, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            # State: 64 x 32 x 32
+            nn.ConvTranspose2d(64, img_channels, 4, 2, 1, bias=False),
+            nn.Tanh()
+            # Output: img_channels x 64 x 64
+        )
         
-    def discriminate(self, x: torch.Tensor) -> torch.Tensor:
-        return self.discriminator(x)
+        # Discriminator
+        self.discriminator = nn.Sequential(
+            # Input: img_channels x 64 x 64
+            nn.Conv2d(img_channels, 64, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            # State: 64 x 32 x 32
+            nn.Conv2d(64, 128, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+            # State: 128 x 16 x 16
+            nn.Conv2d(128, 256, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+            # State: 256 x 8 x 8
+            nn.Conv2d(256, 512, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+            # State: 512 x 4 x 4
+            nn.Flatten(),
+            nn.Linear(512 * 4 * 4, 1),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, z: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass through both generator and discriminator."""
+        fake_images = self.generator(z.view(-1, self.latent_dim))
+        disc_output = self.discriminator(fake_images)
+        return fake_images, disc_output

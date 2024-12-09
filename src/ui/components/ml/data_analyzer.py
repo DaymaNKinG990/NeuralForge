@@ -84,20 +84,33 @@ class DataAnalyzer(QWidget):
     def set_data(self, data: pd.DataFrame):
         """Set data for analysis."""
         try:
+            # Convert numeric column names to strings if needed
+            if not all(isinstance(col, str) for col in data.columns):
+                data = data.rename(columns=lambda x: f"Feature {x}" if isinstance(x, (int, float)) else str(x))
+            
             self.data = data
             self._update_options()
             self._update_plot()
+            
+            # Emit analysis updated signal
+            summary = self.get_analysis_summary()
+            self.analysis_updated.emit(summary)
+            
         except Exception as e:
-            self.logger.error(f"Error setting data: {str(e)}")
+            self.logger.error(f"Error setting data: {str(e)}", exc_info=True)
             
     def _update_options(self):
         """Update analysis options based on selected plot type."""
         try:
+            if self.data is None:
+                return
+                
             plot_type = self.plot_combo.currentText()
             self.options_combo.clear()
             
             if plot_type == "Distribution Analysis":
-                self.options_combo.addItems(self.data.columns)
+                # Ensure all column names are strings
+                self.options_combo.addItems([str(col) for col in self.data.columns])
             elif plot_type == "Correlation Matrix":
                 self.options_combo.addItems(["Pearson", "Spearman", "Kendall"])
             elif plot_type == "Feature Importance":

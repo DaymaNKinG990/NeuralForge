@@ -5,6 +5,9 @@ from typing import Optional, Any, Dict, List
 from enum import Enum
 import sys
 import torch
+from datetime import datetime
+from collections import defaultdict
+from typing import Union
 
 class ErrorLevel(Enum):
     """Error severity levels."""
@@ -16,29 +19,33 @@ class ErrorLevel(Enum):
 class MLError(Exception):
     """Base class for ML-related errors."""
     
-    def __init__(self, message: str,
-                 error_code: str,
-                 level: ErrorLevel = ErrorLevel.ERROR,
-                 details: Optional[Dict[str, Any]] = None):
-        super().__init__(message)
+    def __init__(self, message: str, error_code: str, level: ErrorLevel = ErrorLevel.ERROR, details: Optional[Dict[str, Any]] = None):
+        self.message = message
         self.error_code = error_code
         self.level = level
         self.details = details or {}
-        
-    def __str__(self) -> str:
-        return f"{self.level.value} [{self.error_code}]: {super().__str__()}"
+        super().__init__(f"{level.value} [{error_code}]: {message}")
 
 class DataError(MLError):
-    """Errors related to data handling."""
-    pass
+    """Exception raised for data-related errors."""
+    def __init__(self, message: str, error_code: str = "DATA_ERROR", details: Optional[Dict[str, Any]] = None):
+        super().__init__(message=message, error_code=error_code, level=ErrorLevel.ERROR, details=details)
 
 class ModelError(MLError):
     """Errors related to model operations."""
-    pass
+    def __init__(self, message: str,
+                 error_code: str = "MODEL_ERROR",
+                 level: ErrorLevel = ErrorLevel.ERROR,
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, error_code, level, details)
 
 class ValidationError(MLError):
     """Errors related to validation."""
-    pass
+    def __init__(self, message: str,
+                 error_code: str = "VALIDATION_ERROR",
+                 level: ErrorLevel = ErrorLevel.WARNING,
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, error_code, level, details)
 
 class ErrorHandler:
     """Central error handling system."""
@@ -46,87 +53,33 @@ class ErrorHandler:
     def __init__(self):
         """Initialize error handler."""
         self.logger = logging.getLogger(__name__)
-        self.error_history: List[Dict[str, Any]] = []
+        self.monitors = []
         
-    def handle_error(self, error: Exception,
-                    context: Optional[Dict[str, Any]] = None) -> None:
-        """Handle and log an error."""
-        error_info = self._create_error_info(error, context)
-        self._log_error(error_info)
-        self._store_error(error_info)
-        self._handle_critical_error(error_info)
+    def register_monitor(self, monitor):
+        """Register an error monitor."""
+        self.monitors.append(monitor)
         
-    def _create_error_info(self, error: Exception,
-                          context: Optional[Dict[str, Any]] = None
-                          ) -> Dict[str, Any]:
-        """Create detailed error information."""
+    def handle_error(self, error: MLError):
+        """Handle an error occurrence."""
         error_info = {
-            'type': type(error).__name__,
-            'message': str(error),
+            'timestamp': datetime.now(),
+            'message': error.message,
+            'error_code': error.error_code,
+            'level': error.level,
+            'details': error.details,
             'traceback': traceback.format_exc(),
-            'context': context or {},
-            'timestamp': self._get_timestamp()
+            'type': error.__class__.__name__
         }
         
-        if isinstance(error, MLError):
-            error_info.update({
-                'error_code': error.error_code,
-                'level': error.level.value,
-                'details': error.details
-            })
-            
-        return error_info
+        # Log the error
+        self.logger.error(str(error), exc_info=True)
         
-    def _log_error(self, error_info: Dict[str, Any]) -> None:
-        """Log error with appropriate severity."""
-        level = error_info.get('level', ErrorLevel.ERROR.value)
-        message = (
-            f"Error: {error_info['type']}\n"
-            f"Message: {error_info['message']}\n"
-            f"Context: {error_info['context']}"
-        )
-        
-        if level == ErrorLevel.INFO.value:
-            self.logger.info(message)
-        elif level == ErrorLevel.WARNING.value:
-            self.logger.warning(message)
-        elif level == ErrorLevel.ERROR.value:
-            self.logger.error(message)
-        else:  # CRITICAL
-            self.logger.critical(message)
+        # Notify monitors
+        for monitor in self.monitors:
+            monitor.log_error(error_info)
             
-    def _store_error(self, error_info: Dict[str, Any]) -> None:
-        """Store error in history."""
-        self.error_history.append(error_info)
-        if len(self.error_history) > 1000:  # Limit history size
-            self.error_history.pop(0)
-            
-    def _handle_critical_error(self,
-                             error_info: Dict[str, Any]) -> None:
-        """Handle critical errors."""
-        if error_info.get('level') == ErrorLevel.CRITICAL.value:
-            # Perform emergency cleanup
-            self._cleanup()
-            # Optionally exit
-            sys.exit(1)
-            
-    def _cleanup(self) -> None:
-        """Perform cleanup operations."""
-        try:
-            # Release GPU memory
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            # Close file handles
-            for handler in self.logger.handlers:
-                handler.close()
-        except Exception as e:
-            self.logger.error(f"Error during cleanup: {str(e)}")
-            
-    @staticmethod
-    def _get_timestamp() -> str:
-        """Get current timestamp."""
-        from datetime import datetime
-        return datetime.now().isoformat()
+        # Re-raise the error for proper exception handling
+        raise error
 
 class ErrorMonitor:
     """Monitor and analyze errors."""
@@ -134,45 +87,54 @@ class ErrorMonitor:
     def __init__(self, error_handler: ErrorHandler):
         """Initialize error monitor."""
         self.error_handler = error_handler
-        self.error_counts: Dict[str, int] = {}
-        self.error_patterns: Dict[str, List[Dict[str, Any]]] = {}
+        self.error_history = []
+        self.error_counts = defaultdict(int)
+        self.error_patterns = {}
+        error_handler.register_monitor(self)
         
-    def analyze_errors(self) -> Dict[str, Any]:
-        """Analyze error patterns."""
+    def log_error(self, error_info: Dict[str, Any]):
+        """Log an error occurrence."""
+        self.error_history.append(error_info)
         self._update_error_counts()
         self._identify_patterns()
-        return self._generate_report()
         
-    def _update_error_counts(self) -> None:
+    def _update_error_counts(self):
         """Update error occurrence counts."""
-        self.error_counts = {}
-        for error in self.error_handler.error_history:
+        self.error_counts.clear()
+        for error in self.error_history:
             error_type = error['type']
-            self.error_counts[error_type] = (
-                self.error_counts.get(error_type, 0) + 1
-            )
+            self.error_counts[error_type.lower()] += 1
+            self.error_counts['total_errors'] += 1
             
-    def _identify_patterns(self) -> None:
+    def _identify_patterns(self):
         """Identify common error patterns."""
-        self.error_patterns = {}
-        for error in self.error_handler.error_history:
-            error_type = error['type']
-            if error_type not in self.error_patterns:
-                self.error_patterns[error_type] = []
-            self.error_patterns[error_type].append(error)
+        if not self.error_history:
+            return
             
-    def _generate_report(self) -> Dict[str, Any]:
-        """Generate error analysis report."""
-        return {
-            'total_errors': len(self.error_handler.error_history),
-            'error_counts': self.error_counts,
-            'most_common_error': max(self.error_counts.items(),
-                                   key=lambda x: x[1])[0],
-            'error_patterns': {
-                error_type: len(patterns)
-                for error_type, patterns in self.error_patterns.items()
-            }
+        # Group errors by type
+        error_groups = defaultdict(list)
+        for error in self.error_history:
+            error_groups[error['error_code']].append(error)
+            
+        # Find patterns in each group
+        for code, errors in error_groups.items():
+            if len(errors) >= 2:  # Pattern requires at least 2 occurrences
+                self.error_patterns[code] = {
+                    'count': len(errors),
+                    'frequency': len(errors) / len(self.error_history),
+                    'last_occurrence': max(e['timestamp'] for e in errors)
+                }
+                
+    def get_error_stats(self) -> Dict[str, Any]:
+        """Get error statistics."""
+        stats = {
+            'total_errors': self.error_counts['total_errors'],
+            'data_errors': self.error_counts['dataerror'],
+            'model_errors': self.error_counts['modelerror'],
+            'validation_errors': self.error_counts['validationerror'],
+            'patterns': self.error_patterns
         }
+        return stats
 
 # Example usage:
 def example_usage():
@@ -184,12 +146,10 @@ def example_usage():
         # Simulate data error
         raise DataError(
             message="Invalid data format",
-            error_code="DATA_001",
-            level=ErrorLevel.ERROR,
-            details={'format': 'CSV', 'issue': 'Missing columns'}
+            error_code="DATA_001"
         )
     except Exception as e:
-        error_handler.handle_error(e, {'operation': 'data_loading'})
+        error_handler.handle_error(e)
         
     try:
         # Simulate model error
@@ -200,8 +160,8 @@ def example_usage():
             details={'available_memory': '4GB', 'required_memory': '6GB'}
         )
     except Exception as e:
-        error_handler.handle_error(e, {'operation': 'model_training'})
+        error_handler.handle_error(e)
         
     # Analyze errors
-    analysis = error_monitor.analyze_errors()
+    analysis = error_monitor.get_error_stats()
     print("Error Analysis:", analysis)

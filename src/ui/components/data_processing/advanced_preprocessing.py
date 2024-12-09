@@ -64,7 +64,20 @@ class AdvancedPreprocessor:
                       **kwargs) -> np.ndarray:
         """Scale features using various methods."""
         try:
-            scaler = self.scalers[method]
+            # Always create a new scaler instance to avoid data leakage
+            if method == 'standard':
+                scaler = StandardScaler()
+            elif method == 'minmax':
+                scaler = MinMaxScaler(feature_range=(0, 1))
+            elif method == 'robust':
+                scaler = RobustScaler()
+            elif method == 'power':
+                scaler = PowerTransformer()
+            elif method == 'quantile':
+                scaler = QuantileTransformer()
+            else:
+                raise ValueError(f"Unknown scaling method: {method}")
+                
             if kwargs:
                 scaler.set_params(**kwargs)
             return scaler.fit_transform(data)

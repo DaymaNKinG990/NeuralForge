@@ -68,3 +68,47 @@ class DistributionPlot(PlotBase):
             
         except Exception as e:
             self.logger.error(f"Error plotting feature importance: {str(e)}")
+
+    def update_metrics(self, metrics):
+        """Update plot with training metrics."""
+        try:
+            self.clear_plot()
+            
+            # Convert metrics to numpy array for plotting
+            if isinstance(metrics, (list, tuple)):
+                if all(isinstance(m, dict) for m in metrics):
+                    metrics_data = np.array([list(m.values()) for m in metrics])
+                else:
+                    metrics_data = np.array(metrics)
+            elif isinstance(metrics, dict):
+                metrics_data = np.array([list(metrics.values())])
+            else:
+                # Handle single value metrics
+                metrics_data = np.array([[float(metrics)]])
+            
+            # Create subplots for metrics visualization
+            gs = self.figure.add_gridspec(2, 1)
+            ax1 = self.figure.add_subplot(gs[0])  # Loss plot
+            ax2 = self.figure.add_subplot(gs[1])  # Accuracy plot
+            
+            # Plot training metrics
+            steps = range(1, len(metrics_data) + 1)
+            ax1.plot(steps, metrics_data[:, 0], 'b-', label='Loss')
+            ax1.set_title('Training Loss')
+            ax1.set_xlabel('Step')
+            ax1.set_ylabel('Loss')
+            ax1.grid(True)
+            ax1.legend()
+            
+            if metrics_data.shape[1] > 1:  # If accuracy data exists
+                ax2.plot(steps, metrics_data[:, 1], 'g-', label='Accuracy')
+                ax2.set_title('Training Accuracy')
+                ax2.set_xlabel('Step')
+                ax2.set_ylabel('Accuracy')
+                ax2.grid(True)
+                ax2.legend()
+            
+            self.update_layout()
+            
+        except Exception as e:
+            self.logger.error(f"Error updating metrics plot: {str(e)}", exc_info=True)

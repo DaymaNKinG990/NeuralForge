@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt6.QtCore import pyqtSignal
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import train_test_split
 import logging
@@ -67,6 +68,8 @@ class DataPreprocessor(QWidget):
         self.data = None
         self.labels = None
         self.scaler = None
+        self.processed_data = None
+        self.processed_labels = None
         
     def set_data(self, data, labels=None):
         """Set data for preprocessing."""
@@ -83,54 +86,77 @@ class DataPreprocessor(QWidget):
             if self.data is None:
                 return
                 
-            # Apply scaling
-            scaled_data = self._apply_scaling(self.data)
+            # Apply scaling to training data first
+            X_train, X_test, y_train, y_test = train_test_split(
+                self.data,
+                self.labels,
+                test_size=self.test_size_spin.value(),
+                random_state=self.random_seed_spin.value()
+            )
             
-            # Split data
-            if self.labels is not None:
-                X_train, X_test, y_train, y_test = train_test_split(
-                    scaled_data,
-                    self.labels,
-                    test_size=self.test_size_spin.value(),
-                    random_state=self.random_seed_spin.value()
-                )
-                processed_data = (X_train, X_test)
-                processed_labels = (y_train, y_test)
-            else:
-                processed_data = scaled_data
-                processed_labels = None
+            # Scale training data and fit scaler
+            X_train_scaled = self._apply_scaling(X_train)
             
-            self.preprocessing_completed.emit(processed_data, processed_labels)
+            # Scale test data using the same scaler
+            X_test_scaled = self._apply_scaling(X_test)
+            
+            self.processed_data = (X_train_scaled, X_test_scaled)
+            self.processed_labels = (y_train, y_test)
+            
+            # Emit the processed data
+            self.preprocessing_completed.emit(self.processed_data, self.processed_labels)
             
         except Exception as e:
             self.logger.error(f"Error processing data: {str(e)}")
+            raise
             
     def _apply_scaling(self, data):
         """Apply selected scaling method to data."""
         try:
             scaling_method = self.scaling_combo.currentText()
             
-            if scaling_method == "Standard Scaling":
-                self.scaler = StandardScaler()
-            elif scaling_method == "Min-Max Scaling":
-                self.scaler = MinMaxScaler()
-            elif scaling_method == "Robust Scaling":
-                self.scaler = RobustScaler()
-            else:  # No scaling
+            if scaling_method == "No Scaling":
                 return data
-            
-            if isinstance(data, pd.DataFrame):
-                return pd.DataFrame(
-                    self.scaler.fit_transform(data),
-                    columns=data.columns,
-                    index=data.index
-                )
+                
+            # Convert to numpy for sklearn, ensuring double precision
+            if isinstance(data, torch.Tensor):
+                data_np = data.numpy().astype(np.float64)
             else:
-                return self.scaler.fit_transform(data)
+                data_np = np.asarray(data, dtype=np.float64)
+                
+            # Reshape if needed (sklearn expects 2D array)
+            original_shape = data_np.shape
+            if len(data_np.shape) == 1:
+                data_np = data_np.reshape(-1, 1)
+                
+            # Create and fit scaler if not already fitted
+            if self.scaler is None:
+                if scaling_method == "Standard Scaling":
+                    self.scaler = StandardScaler(copy=True)
+                elif scaling_method == "Min-Max Scaling":
+                    self.scaler = MinMaxScaler(copy=True)
+                elif scaling_method == "Robust Scaling":
+                    self.scaler = RobustScaler(copy=True)
+                    
+                # Fit the scaler on training data
+                self.scaler.fit(data_np)
+                
+            # Transform the data
+            scaled_data = self.scaler.transform(data_np)
+            
+            # Reshape back if needed
+            if len(original_shape) == 1:
+                scaled_data = scaled_data.reshape(-1)
+                
+            # Convert back to tensor if needed, maintaining precision
+            if isinstance(data, torch.Tensor):
+                scaled_data = torch.from_numpy(scaled_data.astype(np.float32)).to(data.dtype)
+                
+            return scaled_data
             
         except Exception as e:
             self.logger.error(f"Error applying scaling: {str(e)}")
-            return data
+            raise
             
     def get_scaler(self):
         """Get the fitted scaler."""
