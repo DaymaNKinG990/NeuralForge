@@ -2,13 +2,19 @@ import pytest
 import time
 import os
 import shutil
+import pickle
 from src.utils.caching import CacheManager, SearchCache, CacheEntry
 
 @pytest.fixture
 def cache_manager():
     """Create a test cache manager with smaller limits"""
+    # Очищаем кэш перед каждым тестом
+    if os.path.exists("cache"):
+        shutil.rmtree("cache")
+    
     manager = CacheManager(max_size_mb=1, max_entries=10)
     yield manager
+    
     # Cleanup
     manager.clear()
     if os.path.exists("cache"):
@@ -74,24 +80,44 @@ def test_cache_entry_count(cache_manager):
 def test_persistent_cache(cache_manager):
     """Test disk persistence"""
     # Set with persistence
-    assert cache_manager.set("persist_key", "persist_value", persist=True)
+    test_value = "persist_value"
+    assert cache_manager.set("persist_key", test_value, persist=True)
+    
+    # Verify it's in memory
+    assert cache_manager.get("persist_key") == test_value
     
     # Clear memory cache
     cache_manager.clear()
     
+    # Verify memory cache is empty
+    assert "persist_key" not in cache_manager.entries
+    
     # Should still be available from disk
-    assert cache_manager.get("persist_key") == "persist_value"
+    assert cache_manager.get("persist_key") == test_value
+    
+    # Verify it's back in memory after loading from disk
+    assert "persist_key" in cache_manager.entries
 
 def test_cache_stats(cache_manager):
     """Test cache statistics"""
-    cache_manager.set("stats_key", "stats_value")
+    test_value = "stats_value"
+    cache_manager.set("stats_key", test_value)
+    
+    # Get twice to increment hits
     cache_manager.get("stats_key")
     cache_manager.get("stats_key")
     
     stats = cache_manager.get_stats()
-    assert stats["entry_count"] == 1
+    assert stats["entries_count"] == 1
     assert stats["total_size"] > 0
-    assert stats["hit_rate"] > 0
+    assert stats["total_hits"] == 2
+    assert stats["disk_cache_size"] == 0  # No persistent cache yet
+    assert 0 <= stats["utilization"] <= 100
+    
+    # Test with persistent cache
+    cache_manager.set("persist_key", test_value, persist=True)
+    stats = cache_manager.get_stats()
+    assert stats["disk_cache_size"] > 0
 
 def test_search_cache_operations(search_cache):
     """Test search cache specific operations"""
@@ -130,7 +156,15 @@ def test_cache_error_handling(cache_manager):
     
     # Should return False but not raise
     assert not cache_manager.set("error_key", UnpickleableObject())
+    assert cache_manager.get("error_key") is None
     
     # Should handle None values
     assert cache_manager.set("none_key", None)
     assert cache_manager.get("none_key") is None
+    
+    # Test with invalid disk cache
+    if not os.path.exists("cache"):
+        os.makedirs("cache")
+    with open(os.path.join("cache", "invalid.cache"), "wb") as f:
+        f.write(b"invalid data")
+    assert cache_manager.get("invalid") is None

@@ -1,29 +1,33 @@
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
-    QPushButton, QComboBox, QLabel, QSpinBox,
-    QProgressBar, QScrollArea
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QLabel, QComboBox, QTextEdit, QSpinBox, QProgressBar,
+    QSlider
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QTextCursor
-from ..utils.performance import PerformanceMonitor
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
+import logging
 from ..utils.caching import cache_manager
-from .styles.style_manager import StyleManager
-from .styles.style_enums import StyleClass, ColorScheme
+from .styles.theme_manager import ThemeManager
+from .styles.adaptive_styles import AdaptiveStyles
+
+logger = logging.getLogger(__name__)
 
 class LLMWorkspace(QWidget):
-    """Workspace for Large Language Model operations.
+    """LLM workspace widget for text generation and model management.
     
-    A specialized workspace for interacting with and managing LLM operations,
-    including model selection, parameter configuration, and result visualization.
+    Provides model selection, parameter configuration, and text generation interface.
     
-    Attributes:
-        model_changed: Signal emitted when the selected model changes
-        style_manager: Manager for applying consistent styles
-        cache: Cache manager for LLM operations
+    Signals:
+        model_changed: Emitted when model selection changes
+        generation_started: Emitted when text generation starts
+        generation_stopped: Emitted when text generation stops
+        generation_complete: Emitted when generation is complete with result
     """
     
     model_changed = pyqtSignal(str)
+    generation_started = pyqtSignal()
+    generation_stopped = pyqtSignal()
+    generation_complete = pyqtSignal(str)
     
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         """Initialize the LLM workspace.
@@ -31,157 +35,398 @@ class LLMWorkspace(QWidget):
         Args:
             parent: Parent widget
         """
-        super().__init__(parent)
-        self.style_manager = StyleManager()
-        self.cache = cache_manager
-        
-        self._init_ui()
-        self._apply_styles()
-        self._connect_signals()
-        
+        try:
+            super().__init__(parent)
+            
+            # Initialize managers and state
+            self._theme_manager = ThemeManager()
+            self.cache = cache_manager
+            self._generation_active = False
+            self._model_loaded = False
+            self._current_model = None
+            self._generation_thread = None
+            
+            # Initialize UI and connections
+            self._init_ui()
+            self._apply_styles()
+            self._connect_signals()
+            
+            logger.debug("LLMWorkspace initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize LLMWorkspace: {str(e)}", exc_info=True)
+            raise
+
+    def cleanup(self) -> None:
+        """Clean up resources before destruction."""
+        try:
+            # Stop any active generation
+            if self._generation_active:
+                self._on_stop()
+                
+            # Wait for thread to finish
+            if self._generation_thread and self._generation_thread.isRunning():
+                self._generation_thread.stop()
+                self._generation_thread.wait()
+                
+            # Clear caches if a model was loaded
+            if hasattr(self, 'cache') and self._current_model:
+                try:
+                    self.cache.clear_model_cache(self._current_model)
+                except AttributeError:
+                    logger.warning("Cache manager does not support model cache clearing")
+                
+            # Reset state
+            self._generation_active = False
+            self._model_loaded = False
+            self._current_model = None
+            self._generation_thread = None
+            
+            logger.debug("LLMWorkspace cleanup completed")
+            
+        except Exception as e:
+            logger.error(f"Error during LLMWorkspace cleanup: {str(e)}", exc_info=True)
+
     def _init_ui(self) -> None:
         """Initialize the UI components."""
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        
-        # Model selection
-        model_layout = QHBoxLayout()
-        self.model_selector = QComboBox()
-        self.model_selector.addItems([
-            "gpt-4",
-            "gpt-3.5-turbo",
-            "text-davinci-003",
-            "code-davinci-002"
-        ])
-        model_layout.addWidget(QLabel("Model:"))
-        model_layout.addWidget(self.model_selector)
-        
-        # Parameters
-        param_layout = QHBoxLayout()
-        
-        # Temperature
-        self.temperature = QSpinBox()
-        self.temperature.setRange(0, 100)
-        self.temperature.setValue(70)
-        self.temperature.setSingleStep(5)
-        param_layout.addWidget(QLabel("Temperature:"))
-        param_layout.addWidget(self.temperature)
-        
-        # Max tokens
-        self.max_tokens = QSpinBox()
-        self.max_tokens.setRange(1, 4096)
-        self.max_tokens.setValue(2048)
-        self.max_tokens.setSingleStep(128)
-        param_layout.addWidget(QLabel("Max Tokens:"))
-        param_layout.addWidget(self.max_tokens)
-        
-        # Input/Output areas
-        self.input_text = QTextEdit()
-        self.input_text.setPlaceholderText("Enter your prompt here...")
-        
-        self.output_text = QTextEdit()
-        self.output_text.setReadOnly(True)
-        
-        # Progress bar
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        
-        # Control buttons
-        button_layout = QHBoxLayout()
-        self.generate_btn = QPushButton("Generate")
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setEnabled(False)
-        button_layout.addWidget(self.generate_btn)
-        button_layout.addWidget(self.stop_btn)
-        
-        # Add all components to main layout
-        layout.addLayout(model_layout)
-        layout.addLayout(param_layout)
-        layout.addWidget(self.input_text)
-        layout.addWidget(self.progress)
-        layout.addLayout(button_layout)
-        layout.addWidget(self.output_text)
-        
+        try:
+            layout = QVBoxLayout()
+            self.setLayout(layout)
+            
+            # Model selection
+            model_layout = QHBoxLayout()
+            self.model_selector = QComboBox()
+            self.model_selector.addItems([
+                "GPT-2",
+                "BLOOM",
+                "LLaMA-7B",
+                "CodeLLaMA"
+            ])
+            model_layout.addWidget(QLabel("Model:"))
+            model_layout.addWidget(self.model_selector)
+            
+            # Generation parameters
+            param_layout = QVBoxLayout()
+            
+            # Temperature slider
+            temp_layout = QHBoxLayout()
+            self.temperature = QSlider(Qt.Orientation.Horizontal)
+            self.temperature.setRange(0, 100)  # 0.0 to 1.0
+            self.temperature.setValue(70)  # Default 0.7
+            self.temp_label = QLabel("Temperature: 0.7")
+            temp_layout.addWidget(self.temp_label)
+            temp_layout.addWidget(self.temperature)
+            
+            # Max length
+            length_layout = QHBoxLayout()
+            self.max_length = QSpinBox()
+            self.max_length.setRange(1, 2048)
+            self.max_length.setValue(256)
+            length_layout.addWidget(QLabel("Max Length:"))
+            length_layout.addWidget(self.max_length)
+            
+            param_layout.addLayout(temp_layout)
+            param_layout.addLayout(length_layout)
+            
+            # Input/Output text areas
+            self.input_text = QTextEdit()
+            self.input_text.setPlaceholderText("Enter prompt here...")
+            self.output_text = QTextEdit()
+            self.output_text.setReadOnly(True)
+            self.output_text.setPlaceholderText("Generated text will appear here...")
+            
+            # Progress bar
+            self.progress = QProgressBar()
+            self.progress.setVisible(False)
+            
+            # Control buttons
+            button_layout = QHBoxLayout()
+            self.generate_btn = QPushButton("Generate")
+            self.stop_btn = QPushButton("Stop")
+            self.stop_btn.setEnabled(False)
+            self.clear_btn = QPushButton("Clear")
+            button_layout.addWidget(self.generate_btn)
+            button_layout.addWidget(self.stop_btn)
+            button_layout.addWidget(self.clear_btn)
+            
+            # Add all components to main layout
+            layout.addLayout(model_layout)
+            layout.addLayout(param_layout)
+            layout.addWidget(QLabel("Input:"))
+            layout.addWidget(self.input_text)
+            layout.addWidget(QLabel("Output:"))
+            layout.addWidget(self.output_text)
+            layout.addWidget(self.progress)
+            layout.addLayout(button_layout)
+            
+        except Exception as e:
+            logger.error(f"Error initializing UI: {e}", exc_info=True)
+            raise
+
     def _apply_styles(self) -> None:
-        """Apply styles to all components."""
-        self.setStyleSheet(self.style_manager.get_component_style(StyleClass.ML_WORKSPACE))
-        
+        """Apply theme-based styles to components"""
+        try:
+            # Get styles from adaptive styles
+            base_style = AdaptiveStyles.get_base_style(self._theme_manager)
+            text_style = AdaptiveStyles.get_text_style(self._theme_manager)
+            button_style = AdaptiveStyles.get_button_style(self._theme_manager)
+            
+            # Apply styles
+            self.setStyleSheet(base_style)
+            self.input_text.setStyleSheet(text_style)
+            self.output_text.setStyleSheet(text_style)
+            self.generate_btn.setStyleSheet(button_style)
+            self.stop_btn.setStyleSheet(button_style)
+            self.clear_btn.setStyleSheet(button_style)
+            
+        except Exception as e:
+            logger.error(f"Error applying styles: {e}", exc_info=True)
+
     def _connect_signals(self) -> None:
-        """Connect widget signals to slots."""
-        self.model_selector.currentTextChanged.connect(self._on_model_changed)
-        self.generate_btn.clicked.connect(self._on_generate)
-        self.stop_btn.clicked.connect(self._on_stop)
-        
+        """Connect widget signals to slots"""
+        try:
+            self.model_selector.currentTextChanged.connect(self._on_model_changed)
+            self.generate_btn.clicked.connect(self._on_generate)
+            self.stop_btn.clicked.connect(self._on_stop)
+            self.clear_btn.clicked.connect(self._on_clear)
+            self.temperature.valueChanged.connect(self._update_temp_label)
+            
+        except Exception as e:
+            logger.error(f"Error connecting signals: {e}", exc_info=True)
+
     def _on_model_changed(self, model: str) -> None:
         """Handle model selection changes.
         
         Args:
             model: Name of the selected model
         """
-        self.model_changed.emit(model)
-        config = self._get_model_config(model)
-        if config:
-            self.max_tokens.setMaximum(config["max_tokens"])
-            self.temperature.setMaximum(config["temp_max"])
-
-    def _update_model_params(self, model: str) -> None:
-        """Update parameter limits based on selected model.
-        
-        Args:
-            model: Name of the selected model
-        """
-        model_configs = {
-            "gpt-4": {"max_tokens": 8192, "temp_max": 200},
-            "gpt-3.5-turbo": {"max_tokens": 4096, "temp_max": 200},
-            "text-davinci-003": {"max_tokens": 4000, "temp_max": 100},
-            "code-davinci-002": {"max_tokens": 8000, "temp_max": 100}
-        }
-        
-        if model in model_configs:
-            config = model_configs[model]
-            self.max_tokens.setMaximum(config["max_tokens"])
-            self.temperature.setMaximum(config["temp_max"])
+        try:
+            if self._generation_active:
+                logger.warning("Cannot change model while generation is active")
+                return
+                
+            # Unload previous model
+            if self._current_model:
+                self.cache.clear_model_cache(self._current_model)
+                
+            # Load new model configuration
+            config = self._get_model_config(model)
+            if not config:
+                logger.error(f"Failed to load configuration for model: {model}")
+                return
+                
+            # Update UI with model-specific settings
+            self.max_length.setRange(1, config.get('max_length', 2048))
+            self.max_length.setValue(config.get('default_length', 256))
+            self.temperature.setValue(int(config.get('default_temp', 0.7) * 100))
             
+            # Update state
+            self._current_model = model
+            self._model_loaded = True
+            
+            # Emit signal
+            self.model_changed.emit(model)
+            logger.debug(f"Model changed to: {model}")
+            
+        except Exception as e:
+            logger.error(f"Error changing model: {str(e)}", exc_info=True)
+            self._model_loaded = False
+
     def _on_generate(self) -> None:
-        """Handle generation button click."""
-        self.generate_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.progress.setVisible(True)
+        """Handle generate button click."""
+        try:
+            if not self._model_loaded:
+                logger.error("No model loaded")
+                return
+                
+            if self._generation_active:
+                logger.warning("Generation already in progress")
+                return
+                
+            prompt = self.input_text.toPlainText().strip()
+            if not prompt:
+                logger.warning("Empty prompt")
+                return
+                
+            # Update state
+            self._generation_active = True
+            self._stop_requested = False
+            
+            # Update UI
+            self.progress.setVisible(True)
+            self.progress.setValue(0)
+            self.generate_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            
+            # Start generation in thread
+            self._start_generation_thread(prompt)
+            
+            # Emit signal
+            self.generation_started.emit()
+            logger.debug("Generation started")
+            
+        except Exception as e:
+            logger.error(f"Error starting generation: {str(e)}", exc_info=True)
+            self._reset_generation_state()
 
     def _on_stop(self) -> None:
         """Handle stop button click."""
-        self._stop_generation()
-        self.generate_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress.setVisible(False)
-        
-    def _start_generation(self) -> None:
-        """Start the text generation process."""
-        prompt = self.input_text.toPlainText()
-        self.progress.setValue(0)
-        self.progress.setVisible(False)
-        
-        # Check cache first
-        cache_key = f"{self.model_selector.currentText()}_{prompt}"
-        if cached_result := self.cache.get(cache_key):
-            self._show_result(cached_result)
-            return
+        try:
+            if self._generation_thread and self._generation_thread.isRunning():
+                self._generation_thread.stop()
+                self._generation_active = False
+                self.generation_stopped.emit()
+                self._reset_generation_state()
+                
+        except Exception as e:
+            logger.error(f"Error stopping generation: {str(e)}", exc_info=True)
+
+    def _on_clear(self) -> None:
+        """Handle clear button click."""
+        try:
+            self.input_text.clear()
+            self.output_text.clear()
             
-        # TODO: Implement actual LLM generation
-        self._show_result("Generation not implemented yet")
-        
-    def _stop_generation(self) -> None:
-        """Stop the ongoing generation process."""
-        # TODO: Implement generation stopping
-        pass
-        
-    def _show_result(self, text: str) -> None:
-        """Display the generation result.
+        except Exception as e:
+            logger.error(f"Error clearing text: {e}", exc_info=True)
+
+    def _reset_generation_state(self) -> None:
+        """Reset generation state and UI."""
+        try:
+            # Reset state
+            self._generation_active = False
+            self._stop_requested = False
+            
+            # Reset UI
+            self.progress.setVisible(False)
+            self.progress.setValue(0)
+            self.generate_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            
+            logger.debug("Generation state reset")
+            
+        except Exception as e:
+            logger.error(f"Error resetting generation state: {str(e)}", exc_info=True)
+
+    def _update_temp_label(self, value: int) -> None:
+        """Update temperature label when slider changes.
         
         Args:
-            text: Generated text to display
+            value: New slider value (0-100)
         """
-        self.output_text.setText(text)
-        self.generate_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress.setVisible(False)
+        try:
+            temp = value / 100.0
+            self.temp_label.setText(f"Temperature: {temp:.2f}")
+            
+        except Exception as e:
+            logger.error(f"Error updating temperature label: {e}", exc_info=True)
+
+    def _get_model_config(self, model: str) -> Optional[Dict[str, Any]]:
+        """Get configuration for a specific model.
+        
+        Args:
+            model: Name of the model
+            
+        Returns:
+            Dictionary with model configuration or None if not found
+        """
+        configs = {
+            "GPT-2": {"max_length": 1024, "default_length": 256, "default_temp": 0.7},
+            "BLOOM": {"max_length": 2048, "default_length": 256, "default_temp": 0.8},
+            "LLaMA-7B": {"max_length": 2048, "default_length": 256, "default_temp": 0.7},
+            "CodeLLaMA": {"max_length": 2048, "default_length": 256, "default_temp": 0.6}
+        }
+        return configs.get(model)
+
+    def update_generation(self, text: str, progress: int = -1) -> None:
+        """Update the output text and progress bar.
+        
+        Args:
+            text: Generated text to append
+            progress: Progress percentage (-1 for completion)
+        """
+        try:
+            self.output_text.setPlainText(text)
+            
+            if progress >= 0:
+                self.progress.setValue(progress)
+            else:
+                self._reset_generation_state()
+                self.generation_complete.emit(text)
+                
+        except Exception as e:
+            logger.error(f"Error updating generation: {e}", exc_info=True)
+
+    def _start_generation_thread(self, prompt: str) -> None:
+        """Start generation in a separate thread."""
+        try:
+            if self._generation_thread and self._generation_thread.isRunning():
+                self._generation_thread.stop()
+                self._generation_thread.wait()
+            
+            self._generation_thread = GenerationThread(prompt, self)
+            
+            # Connect thread signals
+            self._generation_thread.progress.connect(self.update_generation)
+            self._generation_thread.finished.connect(self._on_generation_complete)
+            self._generation_thread.error.connect(self._on_generation_error)
+            
+            self._generation_thread.start()
+            self._generation_active = True
+            self.generation_started.emit()
+            
+        except Exception as e:
+            logger.error(f"Error starting generation thread: {str(e)}", exc_info=True)
+
+    def _on_generation_complete(self, text: str) -> None:
+        """Handle generation completion."""
+        self._generation_active = False
+        self.generation_complete.emit(text)
+        self._reset_generation_state()
+        
+    def _on_generation_error(self, error_msg: str) -> None:
+        """Handle generation error."""
+        self._generation_active = False
+        self.generation_stopped.emit()
+        self._reset_generation_state()
+        self.output_text.append(f"Error: {error_msg}")
+        
+    def closeEvent(self, event) -> None:
+        """Handle widget close event"""
+        try:
+            if self._generation_active:
+                self._on_stop()
+            super().closeEvent(event)
+            
+        except Exception as e:
+            logger.error(f"Error in close event: {e}", exc_info=True)
+            event.accept()
+
+class GenerationThread(QThread):
+    # Define signals for thread communication
+    progress = pyqtSignal(str, int)
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+    
+    def __init__(self, prompt: str, workspace: LLMWorkspace) -> None:
+        super().__init__()
+        self.prompt = prompt
+        self._stop_requested = False
+        
+    def stop(self):
+        self._stop_requested = True
+        
+    def run(self) -> None:
+        try:
+            # Simulate generation process
+            for i in range(100):
+                if self._stop_requested:
+                    break
+                self.progress.emit(f"Generating... {i+1}%\n", i+1)
+                self.msleep(50)  # Increased sleep time for stability
+            self.finished.emit("Generation complete!")
+            
+        except Exception as e:
+            error_msg = f"Error in generation thread: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            self.error.emit(error_msg)

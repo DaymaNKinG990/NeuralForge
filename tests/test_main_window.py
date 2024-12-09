@@ -1,5 +1,5 @@
 import pytest
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QDockWidget, QDoubleSpinBox
+from PyQt6.QtWidgets import QMainWindow, QTabWidget, QDockWidget, QDoubleSpinBox, QApplication
 from PyQt6.QtCore import Qt
 from src.ui.main_window import MainWindow
 from src.ui.code_editor import CodeEditor
@@ -8,13 +8,35 @@ from unittest.mock import MagicMock, patch
 from pathlib import Path
 import tempfile
 import os
+import sys
+from src.utils.preloader import PreloadManager, ComponentPreloader
+
+@pytest.fixture(scope="session")
+def qapp():
+    """Create a QApplication instance for the test session."""
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+    yield app
+    app.quit()
+
+@pytest.fixture(autouse=True)
+def cleanup_preloaders():
+    """Reset preloader instances before and after each test."""
+    PreloadManager.reset_instance()
+    ComponentPreloader.reset_instance()
+    yield
+    PreloadManager.reset_instance()
+    ComponentPreloader.reset_instance()
 
 @pytest.fixture
-def main_window(qtbot):
+def main_window(qapp):
+    """Create a MainWindow instance for each test."""
     with patch('src.ui.main_window.profiler'):  # Mock the profiler
         window = MainWindow()
-        qtbot.addWidget(window)
-        return window
+        yield window
+        window.close()
+        window.deleteLater()
 
 @pytest.fixture
 def temp_dir():
@@ -30,8 +52,11 @@ def test_window_initialization(main_window):
 
 def test_central_widget_setup(main_window):
     """Test central widget and tab setup"""
-    assert isinstance(main_window.tab_widget, QTabWidget)
-    assert main_window.tab_widget.tabPosition() == QTabWidget.TabPosition.North
+    assert isinstance(main_window.central_widget, QTabWidget)
+    assert main_window.central_widget.count() == 0
+    assert main_window.central_widget.tabsClosable()
+    assert main_window.central_widget.isMovable()
+    assert main_window.central_widget.documentMode()
 
 def test_dock_widgets_setup(main_window):
     """Test dock widgets initialization"""
@@ -60,25 +85,26 @@ def test_dock_widgets_setup(main_window):
     "test.txt",
     "test.md"
 ])
-def test_open_file(main_window, qtbot, temp_dir, file_name):
+def test_open_file(main_window, temp_dir, file_name):
     """Test file opening functionality"""
     file_path = temp_dir / file_name
     file_path.touch()
     
     main_window.open_file(file_path)
-    current_widget = main_window.tab_widget.currentWidget()
+    assert main_window.central_widget.count() == 1
+    current_widget = main_window.central_widget.currentWidget()
     assert current_widget is not None
     assert isinstance(current_widget, CodeEditor)
     assert str(current_widget.file_path) == str(file_path)
 
-def test_save_file(main_window, qtbot, temp_dir):
+def test_save_file(main_window, temp_dir):
     """Test file saving functionality"""
     test_file = temp_dir / "test_save.py"
     test_content = "print('Hello, World!')"
     
     # Create a new file
     main_window.open_file(test_file)
-    editor = main_window.tab_widget.currentWidget()
+    editor = main_window.central_widget.currentWidget()
     editor.setPlainText(test_content)
     
     # Save the file

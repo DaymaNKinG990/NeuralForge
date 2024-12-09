@@ -1,5 +1,5 @@
 import pytest
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QApplication
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QApplication, QMessageBox
 from PyQt6.QtCore import Qt
 from src.ui.dialogs.clone_dialog import CloneDialog
 from pathlib import Path
@@ -22,21 +22,16 @@ logger.addHandler(handler)
 # Маркируем все тесты в этом файле как требующие изоляции Qt
 pytestmark = pytest.mark.qt_no_exception_capture
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def qapp():
     """Create the Qt Application."""
     logger.debug("Setting up QApplication")
-    # Убеждаемся, что у нас чистый QApplication для этого модуля
-    if QApplication.instance():
-        QApplication.instance().quit()
-        QApplication.instance().deleteLater()
-    app = QApplication([])
-    logger.debug("Created new QApplication instance")
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+        logger.debug("Created new QApplication instance")
     yield app
-    logger.debug("Cleaning up QApplication")
-    app.quit()
-    app.deleteLater()
-    gc.collect()
+    logger.debug("Test finished, but keeping QApplication for other tests")
 
 @pytest.fixture(autouse=True)
 def setup_test_environment(qapp):
@@ -75,7 +70,6 @@ def clone_dialog(qtbot, qapp, temp_dir):
     with patch('src.utils.git_manager.GitManager._ensure_repo'):
         logger.debug("Creating CloneDialog instance")
         dialog = CloneDialog()
-        dialog_ref = ref(dialog)
         
         dialog.default_clone_path = temp_dir
         dialog.directory_input.setText(str(temp_dir))
@@ -89,7 +83,11 @@ def clone_dialog(qtbot, qapp, temp_dir):
         
         logger.debug("Showing dialog")
         dialog.show()
-        qapp.processEvents()
+        
+        # Безопасная обработка событий
+        app = QApplication.instance()
+        if app:
+            app.processEvents()
         
         logger.debug("Waiting for dialog to be exposed")
         qtbot.waitExposed(dialog, timeout=5000)
@@ -99,21 +97,25 @@ def clone_dialog(qtbot, qapp, temp_dir):
         
         logger.debug("Starting cleanup")
         try:
-            # Проверяем существует ли еще объект
-            if dialog_ref() is not None:
-                logger.debug("Dialog still exists, cleaning up")
-                if dialog_ref().isVisible():
-                    dialog_ref().hide()
-                dialog_ref().close()
-                dialog_ref().deleteLater()
-                qtbot.wait(100)
-                qapp.processEvents()
-            else:
-                logger.debug("Dialog already deleted")
+            if dialog.isVisible():
+                logger.debug("Hiding dialog")
+                dialog.hide()
+                if app:
+                    app.processEvents()
+            
+            logger.debug("Closing dialog")
+            dialog.close()
+            if app:
+                app.processEvents()
+            
+            # Даем время на обработку событий
+            qtbot.wait(100)
+            if app:
+                app.processEvents()
+            
         except RuntimeError as e:
             logger.debug(f"Runtime error during cleanup: {e}")
         finally:
-            gc.collect()
             logger.debug("Cleanup complete")
 
 @pytest.mark.qt
@@ -161,10 +163,16 @@ def test_directory_selection(clone_dialog, qtbot, mocker, temp_dir):
         raise
 
 @pytest.mark.qt
-def test_validation(clone_dialog, temp_dir):
+def test_validation(clone_dialog, qtbot, monkeypatch):
     """Test input validation."""
     logger.debug("Starting validation test")
     try:
+        # Подменяем QMessageBox.warning чтобы избежать показа диалога
+        def mock_warning(*args, **kwargs):
+            return QMessageBox.StandardButton.Ok
+            
+        monkeypatch.setattr(QMessageBox, 'warning', mock_warning)
+        
         # Test with empty URL
         assert not clone_dialog.validate_inputs()
         
@@ -178,9 +186,9 @@ def test_validation(clone_dialog, temp_dir):
         raise
 
 @pytest.mark.qt
-def test_accept_reject(clone_dialog, qtbot, temp_dir):
-    """Test accept and reject functionality."""
-    logger.debug("Starting accept/reject test")
+def test_accept(clone_dialog, qtbot, temp_dir):
+    """Test accept functionality."""
+    logger.debug("Starting accept test")
     try:
         with patch('src.ui.dialogs.clone_dialog.GitManager.clone_repository') as mock_clone:
             # Setup test data
@@ -190,21 +198,52 @@ def test_accept_reject(clone_dialog, qtbot, temp_dir):
             
             # Test accept
             mock_clone.return_value = True
+            
+            # Сохраняем состояние до клика
+            was_visible = clone_dialog.isVisible()
+            
             qtbot.mouseClick(
                 clone_dialog.button_box.button(QDialogButtonBox.StandardButton.Ok),
                 Qt.MouseButton.LeftButton
             )
-            qtbot.wait(100)
-            assert mock_clone.called
             
-            # Test reject
-            qtbot.mouseClick(
-                clone_dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel),
-                Qt.MouseButton.LeftButton
-            )
+            # Даем время на обработку событий
             qtbot.wait(100)
-            assert not clone_dialog.result()
-        logger.debug("Accept/reject test completed successfully")
+            QApplication.instance().processEvents()
+            
+            # Проверяем результаты
+            assert mock_clone.called
+            assert was_visible  # Диалог был видим до клика
+            assert clone_dialog.result() == QDialog.DialogCode.Accepted
+            
+            logger.debug("Accept test completed successfully")
     except Exception as e:
-        logger.error(f"Error in accept/reject test: {e}", exc_info=True)
+        logger.error(f"Error in accept test: {e}", exc_info=True)
+        raise
+
+@pytest.mark.qt
+def test_reject(clone_dialog, qtbot, temp_dir):
+    """Test reject functionality."""
+    logger.debug("Starting reject test")
+    try:
+        # Сохраняем состояние до клика
+        was_visible = clone_dialog.isVisible()
+        
+        # Test reject
+        qtbot.mouseClick(
+            clone_dialog.button_box.button(QDialogButtonBox.StandardButton.Cancel),
+            Qt.MouseButton.LeftButton
+        )
+        
+        # Даем время на обработку событий
+        qtbot.wait(100)
+        QApplication.instance().processEvents()
+        
+        # Проверяем результаты
+        assert was_visible  # Диалог был видим до клика
+        assert clone_dialog.result() == QDialog.DialogCode.Rejected
+        
+        logger.debug("Reject test completed successfully")
+    except Exception as e:
+        logger.error(f"Error in reject test: {e}", exc_info=True)
         raise

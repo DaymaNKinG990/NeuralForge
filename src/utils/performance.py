@@ -5,10 +5,12 @@ from pathlib import Path
 import time
 import psutil
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, Future, TimeoutError
 from dataclasses import dataclass
 from queue import Queue
 import inspect
+import logging
 
 T = TypeVar('T')
 
@@ -69,7 +71,6 @@ class PerformanceMonitor(QObject):
             self.stats_updated.emit(stats)
             
         except Exception as e:
-            import logging
             logging.error(f"Error updating performance stats: {str(e)}", exc_info=True)
 
 class AsyncWorker(QThread):
@@ -168,6 +169,11 @@ class FileSystemCache:
             max_size: Maximum number of entries to cache
             ttl: Time to live in seconds for cache entries
         """
+        if not isinstance(max_size, int) or max_size <= 0:
+            raise ValueError("max_size must be a positive integer")
+        if not isinstance(ttl, (int, float)) or ttl <= 0:
+            raise ValueError("ttl must be a positive number")
+            
         self.max_size = max_size
         self.ttl = ttl
         self.cache: Dict[str, Dict[str, Any]] = {}
@@ -179,7 +185,25 @@ class FileSystemCache:
         self._cleanup_timer.timeout.connect(self.cleanup)
         self._cleanup_timer.start(60000)  # Cleanup every minute
 
-    @lru_cache(maxsize=100)
+    def _validate_path(self, path: Union[str, Path]) -> Path:
+        """Validate and normalize path.
+        
+        Args:
+            path: Path to validate
+            
+        Returns:
+            Normalized Path object
+            
+        Raises:
+            TypeError: If path is not str or Path
+            ValueError: If path is empty
+        """
+        if not isinstance(path, (str, Path)):
+            raise TypeError("Path must be string or Path object")
+        if isinstance(path, str) and not path.strip():
+            raise ValueError("Path cannot be empty")
+        return Path(path) if isinstance(path, str) else path
+
     def get_file_info(self, path: Union[str, Path]) -> Dict[str, Any]:
         """Get cached file information.
         
@@ -189,18 +213,29 @@ class FileSystemCache:
         Returns:
             Dict containing file information
         """
-        path = Path(path) if isinstance(path, str) else path
-        
+        try:
+            path = self._validate_path(path)
+        except (TypeError, ValueError) as e:
+            raise  # Re-raise validation errors
+            
         with self._lock:
             current_time = time.time()
             path_str = str(path)
             
-            # Check cache
+            # Check cache and verify file hasn't been modified
             if path_str in self.cache:
+                cached_info = self.cache[path_str]
                 if current_time - self.access_times[path_str] < self.ttl:
-                    self.access_times[path_str] = current_time
-                    return self.cache[path_str]
-                    
+                    try:
+                        if cached_info['exists']:
+                            stat = path.stat()
+                            if (stat.st_mtime == cached_info['mtime'] and 
+                                stat.st_size == cached_info['size']):
+                                self.access_times[path_str] = current_time
+                                return cached_info
+                    except (OSError, FileNotFoundError):
+                        pass  # File was deleted or can't be accessed
+                        
             # Update cache
             try:
                 stat = path.stat()
@@ -209,14 +244,22 @@ class FileSystemCache:
                     'mtime': stat.st_mtime,
                     'exists': True
                 }
-                self.cache[path_str] = info
-                self.access_times[path_str] = current_time
-                return info
             except FileNotFoundError:
-                info = {'exists': False}
-                self.cache[path_str] = info
-                self.access_times[path_str] = current_time
-                return info
+                info = {'exists': False, 'mtime': 0, 'size': 0}
+            except OSError as e:
+                info = {'exists': False, 'error': str(e), 'mtime': 0, 'size': 0}
+                
+            self.cache[path_str] = info
+            self.access_times[path_str] = current_time
+            self._ensure_size_limit()
+            return info
+
+    def _ensure_size_limit(self):
+        """Ensure cache size is within limits"""
+        while len(self.cache) > self.max_size:
+            oldest = min(self.access_times.items(), key=lambda x: x[1])[0]
+            del self.cache[oldest]
+            del self.access_times[oldest]
 
     def cleanup(self):
         """Remove expired entries"""
@@ -231,11 +274,7 @@ class FileSystemCache:
                 del self.cache[path]
                 del self.access_times[path]
                 
-            # Remove oldest entries if cache is too large
-            while len(self.cache) > self.max_size:
-                oldest = min(self.access_times.items(), key=lambda x: x[1])[0]
-                del self.cache[oldest]
-                del self.access_times[oldest]
+            self._ensure_size_limit()
 
 class ThreadPool:
     """Thread pool for parallel task execution."""
@@ -246,33 +285,105 @@ class ThreadPool:
         Args:
             max_workers: Maximum number of worker threads. Defaults to 2x CPU cores.
         """
-        self.executor = ThreadPoolExecutor(
-            max_workers=max_workers or (psutil.cpu_count() or 1) * 2
-        )
-        self.tasks: Dict[str, Any] = {}
-
-    def submit(self, name: str, func: Callable[..., T], *args, **kwargs) -> None:
-        """Submit task to thread pool"""
-        future = self.executor.submit(func, *args, **kwargs)
-        self.tasks[name] = future
+        self.max_workers = max_workers or (psutil.cpu_count() or 1) * 2
+        self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        self.tasks: Dict[str, Future] = {}
+        self._lock = threading.Lock()
+        self._shutdown = False
         
-    def get_result(self, name: str, timeout: float = None) -> Optional[Any]:
-        """Get result of task"""
-        future = self.tasks.get(name)
-        if future and future.done():
+    def submit(self, name: str, func: Callable[..., T], *args, **kwargs) -> Optional[Future]:
+        """Submit task to thread pool.
+        
+        Args:
+            name: Unique name for the task
+            func: Function to execute
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+            
+        Returns:
+            Future object or None if pool is shutdown
+        """
+        if self._shutdown:
+            return None
+            
+        with self._lock:
+            # Cancel existing task with same name if any
+            self.cancel_task(name)
+            
             try:
-                return future.result(timeout=timeout)
+                future = self.executor.submit(func, *args, **kwargs)
+                self.tasks[name] = future
+                return future
             except Exception as e:
-                print(f"Error in task {name}: {e}")
+                logging.error(f"Error submitting task {name}: {e}")
                 return None
-        return None
+    
+    def get_result(self, name: str, timeout: Optional[float] = None) -> Optional[Any]:
+        """Get result of task.
         
+        Args:
+            name: Task name
+            timeout: Maximum time to wait for result
+            
+        Returns:
+            Task result or None if task failed/not found
+        """
+        with self._lock:
+            future = self.tasks.get(name)
+            if not future:
+                return None
+                
+        try:
+            if future.done():
+                return future.result(timeout=0)  # Don't wait if done
+            elif timeout is not None:
+                return future.result(timeout=timeout)
+            else:
+                return future.result()  # Wait indefinitely
+        except TimeoutError:
+            return None
+        except Exception as e:
+            logging.error(f"Error in task {name}: {e}")
+            return None
+        finally:
+            with self._lock:
+                # Cleanup completed task
+                if name in self.tasks and future.done():
+                    del self.tasks[name]
+    
     def cancel_task(self, name: str) -> bool:
-        """Cancel task if possible"""
-        future = self.tasks.get(name)
-        if future and not future.done():
-            return future.cancel()
-        return False
+        """Cancel task if possible.
+        
+        Args:
+            name: Task name
+            
+        Returns:
+            True if task was cancelled
+        """
+        with self._lock:
+            future = self.tasks.get(name)
+            if future and not future.done():
+                cancelled = future.cancel()
+                if cancelled:
+                    del self.tasks[name]
+                return cancelled
+            return False
+    
+    def shutdown(self, wait: bool = True) -> None:
+        """Shutdown the thread pool.
+        
+        Args:
+            wait: Wait for pending tasks to complete
+        """
+        self._shutdown = True
+        with self._lock:
+            if wait:
+                # Cancel all pending tasks
+                for name, future in list(self.tasks.items()):
+                    if not future.done():
+                        future.cancel()
+            self.executor.shutdown(wait=wait)
+            self.tasks.clear()
 
 @dataclass
 class MemoryUsage:

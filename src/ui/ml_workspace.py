@@ -1,194 +1,160 @@
-from typing import Optional, List, Dict, Any, Tuple
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QProgressBar,
-    QTableWidget, QTableWidgetItem, QScrollArea
-)
+"""Machine Learning Workspace window."""
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+                           QSplitter, QTabWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
-from ..utils.caching import cache_manager
-from .styles.style_manager import StyleManager
-from .styles.style_enums import StyleClass, ColorScheme
+from .styles.theme_manager import ThemeManager
+from .styles.adaptive_styles import AdaptiveStyles
+
+# Data processing components
+from .components.data_processing.data_preprocessor import DataPreprocessor
+from .components.data_processing.data_augmentor import DataAugmentor
+
+# Model components
+from .components.model.model_builder import ModelBuilder
+from .components.model.model_optimizer import ModelOptimizer
+
+# Visualization components
+from .components.visualization.distribution_plot import DistributionPlot
+from .components.visualization.model_plot import ModelPlot
+
+# ML components
+from .components.ml.data_manager import DataManager
+from .components.ml.model_manager import ModelManager
+from .components.ml.hyperparameter_tuner import HyperparameterTuner
+from .components.ml.experiment_tracker import ExperimentTracker
+from .components.ml.data_analyzer import DataAnalyzer
+from .components.ml.model_interpreter import ModelInterpreter
+
+import logging
+import torch
+import torch.nn as nn
+import pandas as pd
+import numpy as np
 
 class MLWorkspace(QWidget):
-    """Workspace for Machine Learning operations.
+    """Machine Learning Workspace window."""
     
-    A specialized workspace for managing and monitoring machine learning models,
-    including training configuration, model selection, and performance visualization.
-    
-    Attributes:
-        model_changed: Signal emitted when the selected model changes
-        training_started: Signal emitted when training begins
-        training_stopped: Signal emitted when training stops
-        style_manager: Manager for applying consistent styles
-        cache: Cache manager for ML operations
-    """
-    
-    model_changed = pyqtSignal(str)
+    # Signals
+    model_changed = pyqtSignal(str)  # Emits model name
     training_started = pyqtSignal()
     training_stopped = pyqtSignal()
     
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        """Initialize the ML workspace.
-        
-        Args:
-            parent: Parent widget
-        """
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.style_manager = StyleManager()
-        self.cache = cache_manager
-        
-        self._init_ui()
-        self._apply_styles()
+        self.logger = logging.getLogger(__name__)
+        self._theme_manager = ThemeManager()
+        self._setup_theme()
+        self._setup_ui()
         self._connect_signals()
         
-    def _init_ui(self) -> None:
-        """Initialize the UI components."""
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+    def _setup_theme(self):
+        """Setup theme for the workspace."""
+        # Apply base styles
+        base_style = AdaptiveStyles.get_base_style(self._theme_manager)
+        self.setStyleSheet(base_style)
         
-        # Model selection
-        model_layout = QHBoxLayout()
-        self.model_selector = QComboBox()
-        self.model_selector.addItems([
-            "ResNet-50",
-            "VGG-16",
-            "BERT-base",
-            "GPT-2-small"
-        ])
-        model_layout.addWidget(QLabel("Model:"))
-        model_layout.addWidget(self.model_selector)
-        
-        # Training parameters
-        param_layout = QHBoxLayout()
-        
-        # Batch size
-        self.batch_size = QSpinBox()
-        self.batch_size.setRange(1, 512)
-        self.batch_size.setValue(32)
-        self.batch_size.setSingleStep(8)
-        param_layout.addWidget(QLabel("Batch Size:"))
-        param_layout.addWidget(self.batch_size)
-        
-        # Learning rate
-        self.learning_rate = QDoubleSpinBox()
-        self.learning_rate.setRange(0.0001, 1.0)
-        self.learning_rate.setValue(0.001)
-        self.learning_rate.setSingleStep(0.0001)
-        self.learning_rate.setDecimals(4)
-        param_layout.addWidget(QLabel("Learning Rate:"))
-        param_layout.addWidget(self.learning_rate)
-        
-        # Epochs
-        self.epochs = QSpinBox()
-        self.epochs.setRange(1, 1000)
-        self.epochs.setValue(10)
-        param_layout.addWidget(QLabel("Epochs:"))
-        param_layout.addWidget(self.epochs)
-        
-        # Training progress
-        self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        
-        # Control buttons
-        button_layout = QHBoxLayout()
-        self.train_btn = QPushButton("Start Training")
-        self.stop_btn = QPushButton("Stop")
-        self.stop_btn.setEnabled(False)
-        button_layout.addWidget(self.train_btn)
-        button_layout.addWidget(self.stop_btn)
-        
-        # Metrics table
-        self.metrics_table = QTableWidget(0, 3)
-        self.metrics_table.setHorizontalHeaderLabels(["Epoch", "Loss", "Accuracy"])
-        
-        # Add all components to main layout
-        layout.addLayout(model_layout)
-        layout.addLayout(param_layout)
-        layout.addWidget(self.progress)
-        layout.addLayout(button_layout)
-        layout.addWidget(self.metrics_table)
-        
-    def _apply_styles(self) -> None:
-        """Apply styles to all components."""
-        self.setStyleSheet(self.style_manager.get_component_style(StyleClass.ML_WORKSPACE))
-        
-    def _connect_signals(self) -> None:
-        """Connect widget signals to slots."""
-        self.model_selector.currentTextChanged.connect(self._on_model_changed)
-        self.train_btn.clicked.connect(self._on_train)
-        self.stop_btn.clicked.connect(self._on_stop)
-        
-    def _on_model_changed(self, model: str) -> None:
-        """Handle model selection changes.
-        
-        Args:
-            model: Name of the selected model
-        """
-        self.model_changed.emit(model)
-        config = self._get_model_config(model)
-        if config:
-            self.batch_size.setValue(config["batch"])
-            self.batch_size.setMaximum(config["max_batch"])
-            self.learning_rate.setValue(config["lr"])
-
-    def _update_model_params(self, model: str) -> None:
-        """Update parameter limits based on selected model.
-        
-        Args:
-            model: Name of the selected model
-        """
-        model_configs = {
-            "ResNet-50": {"max_batch": 128, "lr": 0.001},
-            "VGG-16": {"max_batch": 64, "lr": 0.0005},
-            "BERT-base": {"max_batch": 32, "lr": 0.00001},
-            "GPT-2-small": {"max_batch": 16, "lr": 0.00001}
-        }
-        
-        if model in model_configs:
-            config = model_configs[model]
-            self.batch_size.setMaximum(config["max_batch"])
-            self.learning_rate.setValue(config["lr"])
+    def _setup_ui(self):
+        """Setup the UI components."""
+        try:
+            # Main layout
+            layout = QVBoxLayout()
+            layout.setContentsMargins(2, 2, 2, 2)
+            layout.setSpacing(1)
             
-    def _on_train(self) -> None:
-        """Handle training button click."""
-        self.train_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.progress.setVisible(True)
-        self.training_started.emit()
-
-    def _on_stop(self) -> None:
-        """Handle stop button click."""
-        self._stop_training()
-        self.train_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.progress.setVisible(False)
-        self.training_stopped.emit()
+            # Create tab widget for different sections
+            self.tab_widget = QTabWidget()
+            self.tab_widget.setDocumentMode(True)
+            self.tab_widget.setContentsMargins(0, 0, 0, 0)
+            
+            # Model building tab
+            model_tab = QWidget()
+            model_layout = QVBoxLayout(model_tab)
+            model_layout.setContentsMargins(2, 2, 2, 2)
+            model_layout.setSpacing(1)
+            
+            # Model builder
+            self.model_builder = ModelBuilder(parent=self)
+            model_layout.addWidget(self.model_builder)
+            
+            # Model management tab widget
+            model_tab_widget = QTabWidget()
+            model_tab_widget.addTab(ModelManager(parent=self), "Model Manager")
+            model_tab_widget.addTab(ModelBuilder(parent=self), "Builder")
+            model_tab_widget.addTab(ModelOptimizer(parent=self), "Optimizer")
+            model_tab_widget.addTab(ModelInterpreter(parent=self), "Interpreter")
+            model_layout.addWidget(model_tab_widget)
+            
+            self.tab_widget.addTab(model_tab, "Model")
+            
+            # Data management tab
+            data_tab = QWidget()
+            data_layout = QVBoxLayout(data_tab)
+            data_layout.setContentsMargins(2, 2, 2, 2)
+            data_layout.setSpacing(1)
+            
+            # Data management tab widget
+            data_tab_widget = QTabWidget()
+            data_tab_widget.addTab(DataManager(parent=self), "Data Manager")
+            data_tab_widget.addTab(DataPreprocessor(parent=self), "Preprocessor")
+            data_tab_widget.addTab(DataAugmentor(parent=self), "Augmentor")
+            data_tab_widget.addTab(DataAnalyzer(parent=self), "Analyzer")
+            data_layout.addWidget(data_tab_widget)
+            
+            self.tab_widget.addTab(data_tab, "Data")
+            
+            # Visualization tab
+            viz_tab = QWidget()
+            viz_layout = QVBoxLayout(viz_tab)
+            viz_layout.setContentsMargins(2, 2, 2, 2)
+            viz_layout.setSpacing(1)
+            
+            # Training and visualization tab widget
+            train_tab = QTabWidget()
+            train_tab.addTab(HyperparameterTuner(parent=self), "Tuning")
+            train_tab.addTab(ExperimentTracker(parent=self), "Experiments")
+            train_tab.addTab(DistributionPlot(parent=self), "Distributions")
+            train_tab.addTab(ModelPlot(parent=self), "Model Plot")
+            viz_layout.addWidget(train_tab)
+            
+            self.tab_widget.addTab(viz_tab, "Visualization")
+            
+            # Add tab widget to main layout
+            layout.addWidget(self.tab_widget)
+            
+            # Set minimum sizes
+            self.setMinimumWidth(300)
+            self.setMinimumHeight(400)
+            
+            # Set the layout
+            self.setLayout(layout)
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing ML workspace UI: {str(e)}")
+            raise
+            
+    def _connect_signals(self):
+        """Connect all signals."""
+        try:
+            # Connect model builder signals
+            if hasattr(self, 'model_builder'):
+                self.model_builder.model_created.connect(self._on_model_created)
+                self.model_builder.model_updated.connect(self._on_model_updated)
+                
+        except Exception as e:
+            self.logger.error(f"Error connecting signals: {str(e)}")
+            
+    def _on_model_created(self, model_name):
+        """Handle model creation."""
+        self.model_changed.emit(model_name)
         
-    def _start_training(self) -> None:
-        """Start the training process."""
-        # TODO: Implement actual training logic
-        self.progress.setValue(0)
-        self.progress.setVisible(False)
-        self.training_stopped.emit()
+    def _on_model_updated(self, model_name):
+        """Handle model updates."""
+        self.model_changed.emit(model_name)
         
-    def _stop_training(self) -> None:
-        """Stop the training process."""
-        # TODO: Implement training stop logic
-        pass
-        
-    def update_metrics(self, epoch: int, loss: float, accuracy: float) -> None:
-        """Update the metrics table with new training results.
-        
-        Args:
-            epoch: Current training epoch
-            loss: Training loss value
-            accuracy: Training accuracy value
-        """
-        row = self.metrics_table.rowCount()
-        self.metrics_table.insertRow(row)
-        
-        self.metrics_table.setItem(row, 0, QTableWidgetItem(str(epoch)))
-        self.metrics_table.setItem(row, 1, QTableWidgetItem(f"{loss:.4f}"))
-        self.metrics_table.setItem(row, 2, QTableWidgetItem(f"{accuracy:.2%}"))
-        
-        self.progress.setValue(int((epoch / self.epochs.value()) * 100))
+    def cleanup(self):
+        """Clean up resources."""
+        try:
+            # Clean up any resources, stop threads, etc.
+            pass
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {str(e)}")

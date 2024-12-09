@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QDockWidget, 
                              QMenuBar, QStatusBar, QFileDialog, QMessageBox,
-                             QVBoxLayout, QWidget, QToolBar, QLabel)
+                             QVBoxLayout, QWidget, QToolBar, QLabel, QApplication)
 from PyQt6.QtGui import QAction, QIcon, QKeySequence, QFont, QPaintEvent, QKeyEvent
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QSettings, QTimer
 from .code_editor import CodeEditor
+from .components.file_tree_view import FileTreeView
 from .project_explorer import ProjectExplorer
 from .ml_workspace import MLWorkspace
 from .llm_workspace import LLMWorkspace
@@ -18,11 +19,10 @@ from ..utils.performance import (
 from ..utils.caching import cache_manager, search_cache
 from ..utils.lazy_loading import lazy_import, LazyWidget, component_loader
 from ..utils.profiler import profiler
-from .styles.style_manager import StyleManager
-from .styles.style_enums import StyleClass, ThemeType
+from .styles.theme_manager import ThemeManager
+from .styles.adaptive_styles import AdaptiveStyles
 from pathlib import Path
-from typing import Union
-from PyQt6.QtCore import QSettings
+from typing import Union, Optional, Dict
 import logging
 import sys
 
@@ -33,6 +33,10 @@ class MainWindow(QMainWindow):
             self.logger = logging.getLogger(__name__)
             self.logger.debug("MainWindow initialization started")
             
+            # Initialize theme manager
+            self._theme_manager = ThemeManager()
+            self._setup_theme()
+            
             # Basic window setup
             self.setWindowTitle("NeuroForge IDE")
             self.setMinimumSize(1200, 800)
@@ -42,35 +46,202 @@ class MainWindow(QMainWindow):
             self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, False)
             self.setWindowState(Qt.WindowState.WindowActive)
             
-            # Store open files
+            # Store open files and settings
             self.open_files = {}
+            self._settings = QSettings('NeuralForge', 'IDE')
             
             # Initialize project root
             self.project_root = Path.cwd()
             self.logger.debug(f"Project root set to: {self.project_root}")
             
-            # Initialize style manager first
-            self._style_manager = StyleManager()
-            self.logger.debug("Style manager initialized")
+            # Setup UI components
+            self._setup_ui()
+            self._setup_actions()
+            self._setup_menus()
+            self._setup_toolbars()
+            self._setup_statusbar()
+            self._restore_window_state()
             
-            # Register components for lazy loading
-            self._register_components()
-            self.logger.debug("Components registered")
-            
-            # Initialize UI
-            self._init_ui()
-            self.logger.debug(f"UI initialized, window visible: {self.isVisible()}")
-            
-            self._apply_styles()
-            self.logger.debug("Styles applied")
-            
-            # Final visibility check
-            self.logger.debug(f"Final window state - Visible: {self.isVisible()}, Hidden: {self.isHidden()}, Geometry: {self.geometry()}")
+            self.logger.debug("MainWindow initialization completed")
             
         except Exception as e:
-            self.logger.error(f"Error during MainWindow initialization: {str(e)}", exc_info=True)
+            self.logger.error(f"Error initializing MainWindow: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_theme(self):
+        """Настройка темы интерфейса"""
+        # Apply theme to application palette
+        self.setPalette(self._theme_manager.get_palette())
+        
+        # Apply base styles
+        base_style = AdaptiveStyles.get_base_style(self._theme_manager)
+        self.setStyleSheet(base_style)
+
+    def _setup_ui(self):
+        """Setup UI components"""
+        try:
+            # Track UI state
+            self._ui_initialized = False
+            self._workspace_states = {}
+            
+            # Create a container widget first
+            container = QWidget()
+            if not container:
+                raise RuntimeError("Failed to create container widget")
+            self.setCentralWidget(container)
+            
+            # Create layout for container
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(2, 2, 2, 2)  # Reduce margins
+            layout.setSpacing(1)  # Minimal spacing between widgets
+            
+            # Central widget setup with error handling
+            self.central_widget = QTabWidget()
+            self.central_widget.setTabsClosable(True)
+            self.central_widget.setMovable(True)
+            self.central_widget.setDocumentMode(True)
+            self.central_widget.setContentsMargins(0, 0, 0, 0)  # No margins
+            self.central_widget.tabCloseRequested.connect(self._on_tab_close_requested)
+            
+            # Create file tree dock widget with language icons
+            file_dock = QDockWidget("Files", self)
+            file_dock.setObjectName("FilesDock")
+            file_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea |
+                                    Qt.DockWidgetArea.RightDockWidgetArea)
+            file_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
+                                QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+            
+            # Create file tree view with language icons
+            self.file_tree = FileTreeView()
+            self.file_tree.setContentsMargins(0, 0, 0, 0)  # No margins
+            self.file_tree.file_selected.connect(self._on_file_selected)
+            file_dock.setWidget(self.file_tree)
+            
+            # Add dock widget to main window
+            self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, file_dock)
+            
+            layout.addWidget(self.central_widget)
+            
+            # Setup dock widgets with state tracking using QTimer
+            QTimer.singleShot(0, self._setup_project_explorer)
+            QTimer.singleShot(0, lambda: self._track_workspace_state('project_explorer'))
+            
+            QTimer.singleShot(100, self._setup_ml_workspace)
+            QTimer.singleShot(100, lambda: self._track_workspace_state('ml_workspace'))
+            
+            QTimer.singleShot(200, self._setup_llm_workspace)
+            QTimer.singleShot(200, lambda: self._track_workspace_state('llm_workspace'))
+            
+            QTimer.singleShot(300, self._setup_git_panel)
+            QTimer.singleShot(300, lambda: self._track_workspace_state('git_panel'))
+            
+            QTimer.singleShot(400, self._setup_performance_monitor)
+            QTimer.singleShot(400, lambda: self._track_workspace_state('performance_monitor'))
+            
+            QTimer.singleShot(500, self._setup_python_console)
+            QTimer.singleShot(500, lambda: self._track_workspace_state('python_console'))
+            
+            # Apply component-specific styles
+            QTimer.singleShot(600, self._apply_component_styles)
+            
+            QTimer.singleShot(700, self._mark_ui_initialized)
+            
+            QTimer.singleShot(800, self._setup_dock_layout)
+            
+        except Exception as e:
+            self.logger.error(f"Error during UI setup: {str(e)}", exc_info=True)
             raise
             
+    def _mark_ui_initialized(self):
+        """Mark UI as initialized after all components are set up"""
+        self._ui_initialized = True
+        self.logger.debug("UI setup completed successfully")
+
+    def _apply_component_styles(self):
+        """Применение стилей к компонентам"""
+        try:
+            # Code editor style
+            code_editor_style = AdaptiveStyles.get_code_editor_style(self._theme_manager)
+            for widget in self.findChildren(CodeEditor):
+                widget.setStyleSheet(code_editor_style)
+            
+            # Project explorer style
+            if hasattr(self, 'project_explorer'):
+                explorer_style = AdaptiveStyles.get_project_explorer_style(self._theme_manager)
+                self.project_explorer.setStyleSheet(explorer_style)
+            
+            # Performance monitor style
+            if hasattr(self, 'performance_widget'):
+                monitor_style = AdaptiveStyles.get_performance_monitor_style(self._theme_manager)
+                self.performance_widget.setStyleSheet(monitor_style)
+            
+            # Network visualizer style
+            visualizer_style = AdaptiveStyles.get_network_visualizer_style(self._theme_manager)
+            for workspace in self.findChildren(MLWorkspace):
+                if hasattr(workspace, 'network_visualizer'):
+                    workspace.network_visualizer.setStyleSheet(visualizer_style)
+                    
+        except Exception as e:
+            self.logger.error(f"Error applying component styles: {str(e)}", exc_info=True)
+
+    def _create_dock_widget(self, title: str, widget: QWidget, area: Qt.DockWidgetArea) -> QDockWidget:
+        """Create a dock widget with theme support"""
+        dock = QDockWidget(title, self)
+        dock.setObjectName(f"{title.replace(' ', '')}Dock")
+        dock.setWidget(widget)
+        dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
+                        QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        
+        # Set minimum sizes to prevent docks from becoming too small
+        widget.setMinimumWidth(200)
+        widget.setMinimumHeight(100)
+        
+        # Set content margins
+        if hasattr(widget, 'layout'):
+            if widget.layout():
+                widget.layout().setContentsMargins(2, 2, 2, 2)
+                widget.layout().setSpacing(1)
+        
+        self.addDockWidget(area, dock)
+        return dock
+
+    def _setup_dock_layout(self):
+        """Setup initial dock widget layout"""
+        try:
+            # Split docks vertically in the right area
+            self.splitDockWidget(self.ml_workspace_dock, 
+                               self.llm_workspace_dock, 
+                               Qt.Orientation.Vertical)
+            
+            # Split docks vertically in the left area
+            self.splitDockWidget(self.project_explorer_dock,
+                               self.git_dock,
+                               Qt.Orientation.Vertical)
+            
+            # Add performance monitor to bottom
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea,
+                             self.performance_dock)
+            
+            # Add console to bottom
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea,
+                             self.console_dock)
+            
+            # Tab the bottom docks together
+            self.tabifyDockWidget(self.performance_dock, self.console_dock)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up dock layout: {str(e)}")
+
+    def toggle_theme(self):
+        """Переключение между темной и светлой темой"""
+        current_type = self._settings.value('theme/type', 'dark')
+        new_type = 'light' if current_type == 'dark' else 'dark'
+        self._theme_manager.set_theme(new_type)
+        self._setup_theme()
+        self._apply_component_styles()
+        self._settings.setValue('theme/type', new_type)
+
     def showEvent(self, event) -> None:
         """Override show event to add debugging"""
         super().showEvent(event)
@@ -106,69 +277,33 @@ class MainWindow(QMainWindow):
             self.logger.error(f"Error registering components: {str(e)}", exc_info=True)
             raise
 
-    def _init_ui(self) -> None:
-        """Setup the main window UI with performance monitoring."""
-        try:
-            # Set icon paths
-            self.icon_path = Path(__file__).parent / 'resources' / 'icons'
-            self.logger.debug(f"Icon path set to: {self.icon_path}")
-            
-            # Create central widget and layout
-            central_widget = QWidget()
-            layout = QVBoxLayout(central_widget)
-            
-            # Create tab widget for editors
-            self.tab_widget = QTabWidget()
-            self.tab_widget.setTabsClosable(True)
-            self.tab_widget.tabCloseRequested.connect(self.close_tab)
-            self.tab_widget.setDocumentMode(True)
-            self.tab_widget.setMovable(True)
-            layout.addWidget(self.tab_widget)
-            
-            # Set central widget
-            self.setCentralWidget(central_widget)
-            
-            # Initialize dock widgets
-            self._init_dock_widgets()
-            
-            # Setup toolbars and menus
-            self.setup_tool_bar()
-            self.setup_status_bar()
-            self.setup_menu_bar()
-            
-            self.logger.debug("UI initialization completed successfully")
-            
-        except Exception as e:
-            self.logger.error(f"Error in _init_ui: {str(e)}", exc_info=True)
-            raise
-            
     def _init_dock_widgets(self) -> None:
         """Initialize all dock widgets."""
         try:
             # Project Explorer
             self.project_explorer_dock = QDockWidget("Project Explorer", self)
-            self.project_explorer_dock.setObjectName("ProjectExplorer")
+            self.project_explorer_dock.setObjectName("ProjectExplorerDock")
             self.project_explorer = ProjectExplorer(str(self.project_root), self)
             self.project_explorer_dock.setWidget(self.project_explorer)
             self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.project_explorer_dock)
             
             # ML Workspace
             self.ml_workspace_dock = QDockWidget("ML Workspace", self)
-            self.ml_workspace_dock.setObjectName("MLWorkspace")
+            self.ml_workspace_dock.setObjectName("MLWorkspaceDock")
             self.ml_workspace = MLWorkspace(self)
             self.ml_workspace_dock.setWidget(self.ml_workspace)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.ml_workspace_dock)
             
             # LLM Workspace
             self.llm_workspace_dock = QDockWidget("LLM Workspace", self)
-            self.llm_workspace_dock.setObjectName("LLMWorkspace")
+            self.llm_workspace_dock.setObjectName("LLMWorkspaceDock")
             self.llm_workspace = LLMWorkspace(self)
             self.llm_workspace_dock.setWidget(self.llm_workspace)
             self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.llm_workspace_dock)
             
             # Python Console
             self.python_console_dock = QDockWidget("Python Console", self)
-            self.python_console_dock.setObjectName("PythonConsole")
+            self.python_console_dock.setObjectName("PythonConsoleDock")
             self.python_console = PythonConsole(self)
             self.python_console_dock.setWidget(self.python_console)
             self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.python_console_dock)
@@ -186,6 +321,7 @@ class MainWindow(QMainWindow):
         """Initialize Git panel."""
         try:
             git_dock = QDockWidget("Git", self)
+            git_dock.setObjectName("GitDock")
             self.git_panel = GitPanel(self.project_root, parent=self)
             git_dock.setWidget(self.git_panel)
             git_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | 
@@ -546,34 +682,50 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Clean up resources before closing"""
-        # Stop profiling
-        profiler.stop_memory_tracking()
-        
-        # Clear caches
-        cache_manager.clear()
-        search_cache.clear()
-        component_loader.clear_cache()
-        
-        # Log performance stats
-        slow_ops = profiler.get_slow_operations()
-        if slow_ops:
-            logging.warning("Slow operations detected during session:")
-            for op in slow_ops[:5]:  # Top 5 slowest
-                logging.warning(
-                    f"{op.function_name}: {op.total_time*1000:.2f}ms "
-                    f"({op.calls} calls)"
-                )
+        try:
+            # Save window state
+            self._settings.setValue("windowState", self.saveState())
+            self._settings.setValue("geometry", self.saveGeometry())
+            
+            # Clean up workspaces
+            if hasattr(self, '_ml_workspace'):
+                self._ml_workspace.cleanup()
+            if hasattr(self, '_llm_workspace'):
+                self._llm_workspace.cleanup()
                 
-        memory_ops = profiler.get_memory_intensive_operations()
-        if memory_ops:
-            logging.warning("Memory intensive operations detected:")
-            for op in memory_ops[:5]:  # Top 5 memory intensive
-                memory_mb = (op.memory_peak - op.memory_start) / (1024 * 1024)
-                logging.warning(
-                    f"{op.function_name}: {memory_mb:.1f}MB peak usage"
-                )
+            # Close all files
+            self.close_all_tabs()
+            
+            # Clean up dock widgets
+            for dock in self.findChildren(QDockWidget):
+                if hasattr(dock.widget(), 'cleanup'):
+                    dock.widget().cleanup()
+                dock.close()
                 
-        super().closeEvent(event)
+            # Clean up resources
+            if hasattr(self, '_theme_manager'):
+                self._theme_manager.cleanup()
+            
+            self.logger.debug("MainWindow cleanup completed")
+            event.accept()
+            
+        except Exception as e:
+            self.logger.error(f"Error during MainWindow cleanup: {str(e)}", exc_info=True)
+            event.accept()  # Still close even if cleanup fails
+
+    def _track_workspace_state(self, workspace_name: str):
+        """Track the state of a workspace"""
+        try:
+            widget = getattr(self, f'_{workspace_name}', None)
+            if widget:
+                self._workspace_states[workspace_name] = {
+                    'initialized': True,
+                    'visible': widget.isVisible(),
+                    'enabled': widget.isEnabled()
+                }
+            self.logger.debug(f"Tracked state for workspace: {workspace_name}")
+        except Exception as e:
+            self.logger.error(f"Error tracking workspace state: {str(e)}", exc_info=True)
 
     def run_current_file(self) -> None:
         """Run the current file in the editor."""
@@ -643,10 +795,254 @@ class MainWindow(QMainWindow):
         """
         return self._style_manager
 
-    def change_theme(self, theme: ThemeType):
-        """Изменить тему оформления"""
-        self._style_manager.set_theme(theme)
-        self._apply_styles()
+    def change_theme(self, theme: str):
+        """
+        Change the application theme
+        
+        Args:
+            theme (str): Theme name ('dark' or 'light')
+        """
+        if theme not in ['dark', 'light']:
+            self.logger.warning(f"Invalid theme type: {theme}")
+            return
+            
+        self._theme_manager.set_theme(theme)
+        self._setup_theme()
+        self._apply_component_styles()
+        self._settings.setValue('theme/type', theme)
+
+    def _on_tab_close_requested(self, index: int):
+        """
+        Handle tab close request
+        
+        Args:
+            index (int): Index of the tab to close
+        """
+        try:
+            # Get the widget at the specified index
+            widget = self.central_widget.widget(index)
+            if not widget:
+                return
+                
+            # If it's a code editor, check for unsaved changes
+            if isinstance(widget, CodeEditor):
+                if widget.document().isModified():
+                    response = QMessageBox.question(
+                        self,
+                        "Unsaved Changes",
+                        f"The file has unsaved changes. Do you want to save before closing?",
+                        QMessageBox.StandardButton.Save | 
+                        QMessageBox.StandardButton.Discard | 
+                        QMessageBox.StandardButton.Cancel
+                    )
+                    
+                    if response == QMessageBox.StandardButton.Save:
+                        self._save_file(widget)
+                    elif response == QMessageBox.StandardButton.Cancel:
+                        return
+                        
+                # Remove from open files tracking
+                file_path = widget.file_path
+                if file_path in self.open_files:
+                    del self.open_files[file_path]
+                    
+            # Close the tab
+            self.central_widget.removeTab(index)
+            widget.deleteLater()
+            
+        except Exception as e:
+            self.logger.error(f"Error closing tab: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to close tab: {str(e)}")
+
+    def _save_file(self, editor: CodeEditor):
+        """
+        Save the content of a code editor
+        
+        Args:
+            editor (CodeEditor): Editor widget to save
+        """
+        try:
+            if not editor.file_path:
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "Save File",
+                    str(self.project_root),
+                    "Python Files (*.py);;All Files (*.*)"
+                )
+                if not file_path:
+                    return
+                editor.file_path = file_path
+                
+            with open(editor.file_path, 'w', encoding='utf-8') as f:
+                f.write(editor.toPlainText())
+            editor.document().setModified(False)
+            
+        except Exception as e:
+            self.logger.error(f"Error saving file: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+
+    def close_all_tabs(self):
+        """Close all open tabs with proper handling of unsaved changes"""
+        while self.central_widget.count() > 0:
+            self._on_tab_close_requested(0)
+
+    def _setup_project_explorer(self):
+        """Setup project explorer dock widget"""
+        try:
+            self.project_explorer = ProjectExplorer(self.project_root, parent=self)
+            self.project_explorer_dock = self._create_dock_widget(
+                "Project Explorer",
+                self.project_explorer,
+                Qt.DockWidgetArea.LeftDockWidgetArea
+            )
+            self.project_explorer.file_selected.connect(self._open_file)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up project explorer: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_git_panel(self):
+        """Setup git panel dock widget"""
+        try:
+            self.git_panel = GitPanel(self.project_root, parent=self)
+            self.git_dock = self._create_dock_widget(
+                "Git",
+                self.git_panel,
+                Qt.DockWidgetArea.BottomDockWidgetArea
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up git panel: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_performance_monitor(self):
+        """Setup performance monitor dock widget"""
+        try:
+            self.performance_widget = PerformanceWidget(parent=self)
+            self.performance_dock = self._create_dock_widget(
+                "Performance",
+                self.performance_widget,
+                Qt.DockWidgetArea.RightDockWidgetArea
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up performance monitor: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_python_console(self):
+        """Setup Python console dock widget"""
+        try:
+            self.python_console = PythonConsole(parent=self)
+            self.console_dock = self._create_dock_widget(
+                "Python Console",
+                self.python_console,
+                Qt.DockWidgetArea.BottomDockWidgetArea
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up Python console: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_ml_workspace(self):
+        """Setup ML workspace dock widget"""
+        try:
+            self.ml_workspace = MLWorkspace(parent=self)
+            self.ml_workspace_dock = self._create_dock_widget(
+                "ML Workspace",
+                self.ml_workspace,
+                Qt.DockWidgetArea.RightDockWidgetArea
+            )
+            
+            # Connect ML workspace signals
+            self.ml_workspace.model_changed.connect(self._on_ml_model_changed)
+            self.ml_workspace.training_started.connect(self._on_training_started)
+            self.ml_workspace.training_stopped.connect(self._on_training_stopped)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up ML workspace: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_llm_workspace(self):
+        """Setup LLM workspace dock widget"""
+        try:
+            self.llm_workspace = LLMWorkspace(parent=self)
+            self.llm_workspace_dock = self._create_dock_widget(
+                "LLM Workspace",
+                self.llm_workspace,
+                Qt.DockWidgetArea.RightDockWidgetArea
+            )
+            
+            # Connect LLM workspace signals
+            self.llm_workspace.model_changed.connect(self._on_llm_model_changed)
+            self.llm_workspace.generation_started.connect(self._on_generation_started)
+            self.llm_workspace.generation_stopped.connect(self._on_generation_stopped)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up LLM workspace: {str(e)}", exc_info=True)
+            raise
+
+    # ML Workspace event handlers
+    def _on_ml_model_changed(self, model: str):
+        """Handle ML model change"""
+        self.status_bar.showMessage(f"ML Model changed to: {model}")
+
+    def _on_training_started(self):
+        """Handle ML training start"""
+        self.status_bar.showMessage("ML Training started...")
+
+    def _on_training_stopped(self):
+        """Handle ML training stop"""
+        self.status_bar.showMessage("ML Training stopped")
+
+    # LLM Workspace event handlers
+    def _on_llm_model_changed(self, model: str):
+        """Handle LLM model change"""
+        self.status_bar.showMessage(f"LLM Model changed to: {model}")
+
+    def _on_generation_started(self):
+        """Handle LLM generation start"""
+        self.status_bar.showMessage("LLM Generation started...")
+
+    def _on_generation_stopped(self):
+        """Handle LLM generation stop"""
+        self.status_bar.showMessage("LLM Generation stopped")
+
+    def _open_file(self, file_path: str):
+        """
+        Open a file in the editor
+        
+        Args:
+            file_path (str): Path to the file to open
+        """
+        try:
+            # Check if file is already open
+            if file_path in self.open_files:
+                self.central_widget.setCurrentWidget(self.open_files[file_path])
+                return
+                
+            # Create new editor for the file
+            editor = CodeEditor(parent=self)
+            editor.file_path = file_path
+            
+            # Load file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                editor.setPlainText(f.read())
+                
+            # Add to tracking
+            self.open_files[file_path] = editor
+            
+            # Add new tab
+            file_name = Path(file_path).name
+            index = self.central_widget.addTab(editor, file_name)
+            self.central_widget.setCurrentIndex(index)
+            
+            # Apply editor-specific styles
+            editor_style = AdaptiveStyles.get_code_editor_style(self._theme_manager)
+            editor.setStyleSheet(editor_style)
+            
+        except Exception as e:
+            self.logger.error(f"Error opening file: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to open file: {str(e)}")
 
     def _load_icon(self, icon_name: str) -> QIcon:
         """Load an icon from the resources directory with comprehensive error handling.
@@ -720,3 +1116,292 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Unexpected error loading icon {icon_name}: {str(e)}", exc_info=True)
             return QIcon()
+
+    def _setup_actions(self):
+        """Setup all actions for menus and toolbars"""
+        try:
+            # File actions
+            self.new_action = QAction("&New", self)
+            self.new_action.setShortcut(QKeySequence.StandardKey.New)
+            self.new_action.triggered.connect(self._new_file)
+            
+            self.open_action = QAction("&Open", self)
+            self.open_action.setShortcut(QKeySequence.StandardKey.Open)
+            self.open_action.triggered.connect(self._open_file_dialog)
+            
+            self.save_action = QAction("&Save", self)
+            self.save_action.setShortcut(QKeySequence.StandardKey.Save)
+            self.save_action.triggered.connect(self._save_current_file)
+            
+            self.save_as_action = QAction("Save &As...", self)
+            self.save_as_action.setShortcut(QKeySequence.StandardKey.SaveAs)
+            self.save_as_action.triggered.connect(self._save_as)
+            
+            self.close_action = QAction("&Close", self)
+            self.close_action.setShortcut(QKeySequence.StandardKey.Close)
+            self.close_action.triggered.connect(self._close_current_tab)
+            
+            self.exit_action = QAction("E&xit", self)
+            self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+            self.exit_action.triggered.connect(self.close)
+            
+            # Edit actions
+            self.undo_action = QAction("&Undo", self)
+            self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+            self.undo_action.triggered.connect(self._undo)
+            
+            self.redo_action = QAction("&Redo", self)
+            self.redo_action.setShortcut(QKeySequence.StandardKey.Redo)
+            self.redo_action.triggered.connect(self._redo)
+            
+            self.cut_action = QAction("Cu&t", self)
+            self.cut_action.setShortcut(QKeySequence.StandardKey.Cut)
+            self.cut_action.triggered.connect(self._cut)
+            
+            self.copy_action = QAction("&Copy", self)
+            self.copy_action.setShortcut(QKeySequence.StandardKey.Copy)
+            self.copy_action.triggered.connect(self._copy)
+            
+            self.paste_action = QAction("&Paste", self)
+            self.paste_action.setShortcut(QKeySequence.StandardKey.Paste)
+            self.paste_action.triggered.connect(self._paste)
+            
+            # View actions
+            self.toggle_theme_action = QAction("Toggle &Theme", self)
+            self.toggle_theme_action.setShortcut("Ctrl+T")
+            self.toggle_theme_action.triggered.connect(self.toggle_theme)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up actions: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_menus(self):
+        """Setup menu bar and menus"""
+        try:
+            # Create menu bar
+            self.menu_bar = self.menuBar()
+            
+            # File menu
+            self.file_menu = self.menu_bar.addMenu("&File")
+            self.file_menu.addAction(self.new_action)
+            self.file_menu.addAction(self.open_action)
+            self.file_menu.addAction(self.save_action)
+            self.file_menu.addAction(self.save_as_action)
+            self.file_menu.addSeparator()
+            self.file_menu.addAction(self.close_action)
+            self.file_menu.addSeparator()
+            self.file_menu.addAction(self.exit_action)
+            
+            # Edit menu
+            self.edit_menu = self.menu_bar.addMenu("&Edit")
+            self.edit_menu.addAction(self.undo_action)
+            self.edit_menu.addAction(self.redo_action)
+            self.edit_menu.addSeparator()
+            self.edit_menu.addAction(self.cut_action)
+            self.edit_menu.addAction(self.copy_action)
+            self.edit_menu.addAction(self.paste_action)
+            
+            # View menu
+            self.view_menu = self.menu_bar.addMenu("&View")
+            self.view_menu.addAction(self.toggle_theme_action)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up menus: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_toolbars(self):
+        """Setup toolbars"""
+        try:
+            # Main toolbar
+            self.main_toolbar = QToolBar("Main", self)
+            self.main_toolbar.setObjectName("MainToolbar")
+            self.addToolBar(self.main_toolbar)
+            self.main_toolbar.addAction(self.new_action)
+            self.main_toolbar.addAction(self.open_action)
+            self.main_toolbar.addAction(self.save_action)
+            
+            # Edit toolbar
+            self.edit_toolbar = QToolBar("Edit", self)
+            self.edit_toolbar.setObjectName("EditToolbar")
+            self.addToolBar(self.edit_toolbar)
+            self.edit_toolbar.addAction(self.undo_action)
+            self.edit_toolbar.addAction(self.redo_action)
+            self.edit_toolbar.addAction(self.cut_action)
+            self.edit_toolbar.addAction(self.copy_action)
+            self.edit_toolbar.addAction(self.paste_action)
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up toolbars: {str(e)}", exc_info=True)
+            raise
+
+    def _setup_statusbar(self):
+        """Setup status bar"""
+        try:
+            self.status_bar = self.statusBar()
+            self.status_bar.showMessage("Ready")
+            
+        except Exception as e:
+            self.logger.error(f"Error setting up status bar: {str(e)}", exc_info=True)
+            raise
+
+    def _restore_window_state(self):
+        """Restore window state from settings"""
+        try:
+            geometry = self._settings.value("geometry")
+            if geometry:
+                self.restoreGeometry(geometry)
+                
+            state = self._settings.value("windowState")
+            if state:
+                self.restoreState(state)
+                
+        except Exception as e:
+            self.logger.error(f"Error restoring window state: {str(e)}", exc_info=True)
+
+    # Action handlers
+    def _new_file(self):
+        """Create a new file"""
+        try:
+            editor = CodeEditor(parent=self)
+            index = self.central_widget.addTab(editor, "Untitled")
+            self.central_widget.setCurrentIndex(index)
+            editor_style = AdaptiveStyles.get_code_editor_style(self._theme_manager)
+            editor.setStyleSheet(editor_style)
+            
+        except Exception as e:
+            self.logger.error(f"Error creating new file: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to create new file: {str(e)}")
+
+    def _open_file_dialog(self):
+        """Show open file dialog"""
+        try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Open File",
+                str(self.project_root),
+                "Python Files (*.py);;All Files (*.*)"
+            )
+            if file_path:
+                self._open_file(file_path)
+                
+        except Exception as e:
+            self.logger.error(f"Error showing open file dialog: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to open file dialog: {str(e)}")
+
+    def _save_current_file(self):
+        """Save current file"""
+        try:
+            current_widget = self.central_widget.currentWidget()
+            if isinstance(current_widget, CodeEditor):
+                self._save_file(current_widget)
+                
+        except Exception as e:
+            self.logger.error(f"Error saving current file: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+
+    def _save_as(self):
+        """Save current file with new name"""
+        try:
+            current_widget = self.central_widget.currentWidget()
+            if isinstance(current_widget, CodeEditor):
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "Save File As",
+                    str(self.project_root),
+                    "Python Files (*.py);;All Files (*.*)"
+                )
+                if file_path:
+                    current_widget.file_path = file_path
+                    self._save_file(current_widget)
+                    file_name = Path(file_path).name
+                    self.central_widget.setTabText(
+                        self.central_widget.currentIndex(),
+                        file_name
+                    )
+                    
+        except Exception as e:
+            self.logger.error(f"Error saving file as: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+
+    def _close_current_tab(self):
+        """Close current tab"""
+        current_index = self.central_widget.currentIndex()
+        if current_index >= 0:
+            self._on_tab_close_requested(current_index)
+
+    def _undo(self):
+        """Undo last action in current editor"""
+        current_widget = self.central_widget.currentWidget()
+        if isinstance(current_widget, CodeEditor):
+            current_widget.undo()
+
+    def _redo(self):
+        """Redo last undone action in current editor"""
+        current_widget = self.central_widget.currentWidget()
+        if isinstance(current_widget, CodeEditor):
+            current_widget.redo()
+
+    def _cut(self):
+        """Cut selected text in current editor"""
+        current_widget = self.central_widget.currentWidget()
+        if isinstance(current_widget, CodeEditor):
+            current_widget.cut()
+
+    def _copy(self):
+        """Copy selected text in current editor"""
+        current_widget = self.central_widget.currentWidget()
+        if isinstance(current_widget, CodeEditor):
+            current_widget.copy()
+
+    def _paste(self):
+        """Paste text in current editor"""
+        current_widget = self.central_widget.currentWidget()
+        if isinstance(current_widget, CodeEditor):
+            current_widget.paste()
+
+    def _on_file_selected(self, file_path: str):
+        """Handle file selection from tree view.
+        
+        Args:
+            file_path: Path to selected file
+        """
+        try:
+            if not file_path:
+                self.logger.warning("No file path provided")
+                return
+                
+            if not Path(file_path).is_file():
+                self.logger.warning(f"Not a file: {file_path}")
+                return
+                
+            # Check if file is already open
+            if file_path in self.open_files:
+                self.central_widget.setCurrentWidget(self.open_files[file_path])
+                return
+                
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                self.logger.error(f"Error reading file {file_path}: {str(e)}")
+                QMessageBox.critical(self, "Error", f"Could not read file: {str(e)}")
+                return
+                
+            # Create new editor for the file
+            editor = CodeEditor()
+            editor.setPlainText(content)
+            
+            # Add editor to tab widget
+            file_name = Path(file_path).name
+            index = self.central_widget.addTab(editor, file_name)
+            self.central_widget.setCurrentIndex(index)
+            
+            # Store reference to open file
+            self.open_files[file_path] = editor
+            
+            self.status_bar.showMessage(f"Opened: {file_path}")
+            self.logger.debug(f"Successfully opened file: {file_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Error handling file selection: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Could not open file: {str(e)}")
